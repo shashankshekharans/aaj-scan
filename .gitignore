@@ -1,0 +1,7 @@
+node_modules/
+.env
+eval/cards/*
+!eval/cards/.gitkeep
+eval/results/*
+!eval/results/.gitkeep
+eval/ground-truth.json
