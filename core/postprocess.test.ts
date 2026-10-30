@@ -113,6 +113,15 @@ describe("buildCard", () => {
     expect(codes(buildCard(e, ocrFor(e)))).toContain("email_domain_mismatch:email");
   });
 
+  it("accepts an email that matches the company name even when the website differs", () => {
+    // Patterns seen on real cards (fictional values): brand word inside the
+    // email domain with a sister-brand website, and .in email vs .com website.
+    const brand = { ...base, company: "ZEPHYR", emails: ["anita@zephyrwatch.com"], website: "www.lumora.com" };
+    expect(codes(buildCard(brand, ocrFor(brand)))).not.toContain("email_domain_mismatch:email");
+    const tld = { ...base, company: "Brightcook Home Appliances Pvt. Ltd.", emails: ["ravi.k@brightcook.in"], website: "www.brightcook.com" };
+    expect(codes(buildCard(tld, ocrFor(tld)))).not.toContain("email_domain_mismatch:email");
+  });
+
   it("notes a personal email without blocking approval", () => {
     const e = { ...base, emails: ["priya.nair@gmail.com"] };
     const r = buildCard(e, ocrFor(e));

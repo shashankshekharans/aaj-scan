@@ -26,7 +26,15 @@ export interface CardScore {
 function norm(field: FieldName, v: string | null): string | null {
   if (!v) return null;
   if (field === "phone") return v.replace(/\D/g, "").slice(-10) || null;
-  return v.toLowerCase().replace(/\s+/g, " ").replace(/[.,;:]+$/, "").trim() || null;
+  return (
+    v
+      .toLowerCase()
+      .replace(/[‐-―−]/g, "-") // en/em dashes, minus → hyphen
+      .replace(/\s*-\s*/g, "-")
+      .replace(/\s+/g, " ")
+      .replace(/[.,;:]+$/, "")
+      .trim() || null
+  );
 }
 
 export function scoreCard(truth: Truth, result: CardResult): CardScore {
