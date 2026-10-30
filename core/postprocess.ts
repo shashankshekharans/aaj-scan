@@ -42,11 +42,21 @@ function sameSite(a: string, b: string) {
   return a === b || a.endsWith("." + b) || b.endsWith("." + a);
 }
 
-/** Does the email domain's main label appear in the company name? */
+const GENERIC_WORDS = new Set(["private", "limited", "india", "group", "company", "corporation", "industries", "solutions", "technologies", "services", "enterprises", "international", "trading", "home", "homes"]);
+
+/**
+ * Does the email domain resemble the company name? Either the domain label is
+ * inside the name ("brightcook" in "Brightcook Home Appliances") or a
+ * distinctive word of the name is inside the label ("zephyr" in "zephyrwatch").
+ */
 function domainMatchesCompany(domain: string, company: string | null) {
   if (!company) return false;
   const label = domain.split(".")[0] ?? "";
-  return label.length >= 3 && alnum(company).includes(label);
+  if (label.length >= 3 && alnum(company).includes(label)) return true;
+  return company
+    .split(/\s+/)
+    .map(alnum)
+    .some((w) => w.length >= 4 && !GENERIC_WORDS.has(w) && label.includes(w));
 }
 
 function pickEmail(e: Extraction, company: string | null, site: string | null, flags: Flag[]): string | null {
@@ -70,9 +80,11 @@ function pickEmail(e: Extraction, company: string | null, site: string | null, f
   const domain = domainOf(chosen);
   if (PERSONAL_DOMAINS.has(domain)) {
     flags.push({ code: "personal_email", field: "email", severity: "info", message: "Personal email address" });
-  } else if (site && !sameSite(domain, site)) {
-    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: `Email domain differs from website (${site})` });
-  } else if (!site && !domainMatchesCompany(domain, company)) {
+  } else if ((site && sameSite(domain, site)) || domainMatchesCompany(domain, company)) {
+    // Consistent with the card.
+  } else if (site) {
+    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: `Email domain differs from website (${site}) and company name` });
+  } else {
     flags.push({ code: "email_domain_mismatch", field: "email", severity: "info", message: "Email domain does not resemble the company name" });
   }
   return chosen;

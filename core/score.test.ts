@@ -23,6 +23,15 @@ describe("scoreCard", () => {
     expect(r.cardCorrect).toBe(true);
   });
 
+  it("treats dash styles and spacing around dashes as equal", () => {
+    const t = { ...truth, fields: { ...fields, jobTitle: "Head – Corporate Sales" } };
+    const r = scoreCard(t, { ...ok, fields: { ...fields, jobTitle: "Head - Corporate Sales" } });
+    expect(r.fields.find((f) => f.field === "jobTitle")?.outcome).toBe("correct");
+    const t2 = { ...truth, fields: { ...fields, jobTitle: "Sales Manager- State Level" } };
+    const r2 = scoreCard(t2, { ...ok, fields: { ...fields, jobTitle: "Sales Manager - State Level" } });
+    expect(r2.fields.find((f) => f.field === "jobTitle")?.outcome).toBe("correct");
+  });
+
   it("classifies an unflagged wrong value as silent", () => {
     const r = scoreCard(truth, { ...ok, fields: { ...fields, lastName: "Nalr" } });
     expect(r.fields.find((f) => f.field === "lastName")?.outcome).toBe("wrong_silent");

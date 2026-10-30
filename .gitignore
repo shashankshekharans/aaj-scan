@@ -5,3 +5,7 @@ eval/cards/*
 eval/results/*
 !eval/results/.gitkeep
 eval/ground-truth.json
+
+# Real card photos (personal data) - never commit
+Sample Cards/
+eval/ground-truth-review.md

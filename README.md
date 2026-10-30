@@ -7,15 +7,18 @@ Turns photos of business cards from events into a HubSpot-ready CSV — free to 
 
 ## Next steps (where to pick up)
 
-Status as of 2026-10-29: PRD approved, evaluation harness built and tested (37 tests). Provider adapters not yet run against the live APIs.
+Status as of 2026-10-30: PRD approved; evaluation harness built and tested (39 tests). 20 real card photos added locally and ground truth drafted. OCR-only baseline measured: names ~6%, company 12%, email 88%, phone 76% → OCR alone is not enough; AI providers not yet run (no keys).
 
-1. **You:** create free accounts — Google AI Studio, Groq, Cloudflare, Mistral (links in [eval/README.md](eval/README.md)).
-2. **You:** copy `.env.example` → `.env` and paste the keys (never into chat).
-3. **You:** note each dashboard's free requests-per-day limit.
-4. **You:** put 20–30 varied card photos in `eval/cards/` as `card-01.jpg`, `card-02.jpg`, … (keep the physical cards in order).
-5. **Maintainer:** run `npm run eval -- --limit 3` smoke test, fix any adapter a provider rejects.
-6. **Maintainer:** draft `eval/ground-truth.json` from the photos → **you** verify each entry against the physical cards.
-7. **Maintainer:** full evaluation → pick provider priority order → then build the proxy Worker and the PWA.
+Done: ~~card photos~~ (in `eval/cards/`, local only) · ~~draft ground truth~~ (`eval/ground-truth.json`, local only).
+
+1. **You:** verify `eval/ground-truth-review.md` against the physical cards (tick each row).
+2. **You:** decide two rules — cards listing several people (recommended: first-listed person only) and company cards with no person's name (recommended: flag for review, export with blank name).
+3. **You:** create free accounts — Google AI Studio, Groq, Cloudflare, Mistral (links in [eval/README.md](eval/README.md)); copy `.env.example` → `.env` and paste the keys (never into chat); note each dashboard's requests-per-day limit.
+4. **Maintainer:** `npm run eval -- --limit 3` smoke test, fix any adapter a provider rejects.
+5. **Maintainer:** full evaluation; test cropping the card before OCR (noisy OCR may over-flag); pick provider priority order.
+6. **Maintainer:** build the proxy Worker and the PWA.
+
+Card photos, ground truth and `.env` are git-ignored (personal data / secrets): on another machine, copy them over manually.
 
 ## Layout
 
