@@ -9,6 +9,8 @@ Turns photos of business cards from events into a HubSpot-ready CSV — free to 
 
 Status as of 2026-10-31: the installable PWA and unified Cloudflare Worker are built. The app supports passcode access, camera/gallery intake, on-device image preparation, an offline queue, Gemini extraction with Workers AI fallback, review/edit/approval, and HubSpot-ready CSV export. The light-only interface follows AAJ's brand palette and uses Plus Jakarta Sans with Inter.
 
+Gemini uses an automatic model pool. The evaluated `gemini-3.5-flash-lite` model is preferred; quota, rate-limit, capacity, timeout, or model-availability errors rotate to the next configured Gemini model before the app falls back to Cloudflare Workers AI. Configure the order with `GEMINI_MODELS`.
+
 All 20 evaluation cards have verified ground truth. Combined full-frame and cropped OCR grounding plus review rules produced zero silent errors for Gemini and Cloudflare. Groq remains manual-review only; Mistral and NVIDIA remain excluded because free API access was unavailable.
 
 ## Next steps

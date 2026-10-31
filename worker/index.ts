@@ -1,5 +1,12 @@
 import { parseExtraction } from "../core/extraction";
 import { EXTRACTION_PROMPT, EXTRACTION_SCHEMA } from "../core/prompt";
+import {
+  GeminiHttpError,
+  geminiModelOrder,
+  retryDelay,
+  shouldRetryGemini,
+  shouldRotateGeminiModel,
+} from "./gemini-routing";
 
 interface Env {
   ASSETS: Fetcher;
@@ -7,6 +14,7 @@ interface Env {
   TEAM_PASSCODE: string;
   GEMINI_API_KEY: string;
   GEMINI_MODEL?: string;
+  GEMINI_MODELS?: string;
   CF_MODEL?: string;
 }
 
@@ -46,26 +54,55 @@ function readGeminiText(value: unknown): string {
   return text;
 }
 
-async function callGemini(env: Env, input: ExtractRequest) {
-  const model = env.GEMINI_MODEL ?? "gemini-3.5-flash-lite";
+async function callGeminiModel(env: Env, input: ExtractRequest, model: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
   const contents = [{ parts: [{ text: EXTRACTION_PROMPT }, { inline_data: { mime_type: input.mimeType, data: input.imageBase64 } }] }];
   const request = async (generationConfig: object) => {
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-      body: JSON.stringify({ contents, generationConfig }),
-      signal: AbortSignal.timeout(75_000),
-    });
-    if (!response.ok) throw new Error(`Gemini ${response.status}`);
-    return response.json();
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: JSON.stringify({ contents, generationConfig }),
+        signal: AbortSignal.timeout(75_000),
+      });
+      const body = await response.text();
+      if (response.ok) return JSON.parse(body) as unknown;
+
+      const retryAfter = response.headers.get("retry-after");
+      const seconds = retryAfter ? Number(retryAfter) : Number.NaN;
+      const error = new GeminiHttpError(
+        response.status,
+        Number.isFinite(seconds) ? seconds * 1_000 : null,
+        `Gemini ${model} returned ${response.status}`,
+      );
+      if (attempt === 0 && shouldRetryGemini(error)) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelay(error, attempt)));
+        continue;
+      }
+      throw error;
+    }
+    throw new Error(`Gemini ${model} retry limit reached`);
   };
   try {
     return readGeminiText(await request({ responseMimeType: "application/json", responseJsonSchema: EXTRACTION_SCHEMA, temperature: 0 }));
   } catch (error) {
-    if (!(error instanceof Error) || !/Gemini 400/.test(error.message)) throw error;
+    if (!(error instanceof GeminiHttpError) || error.status !== 400) throw error;
     return readGeminiText(await request({ responseMimeType: "application/json", temperature: 0 }));
   }
+}
+
+async function callGemini(env: Env, input: ExtractRequest) {
+  const configured = env.GEMINI_MODELS ?? env.GEMINI_MODEL;
+  const failures: string[] = [];
+  for (const model of geminiModelOrder(configured)) {
+    try {
+      return { text: await callGeminiModel(env, input, model), model };
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : `${model} failed`);
+      if (!shouldRotateGeminiModel(error)) throw error;
+    }
+  }
+  throw new Error(`Gemini model pool unavailable: ${failures.join("; ")}`);
 }
 
 function readCloudflareText(value: unknown): string {
@@ -113,8 +150,9 @@ async function extract(request: Request, env: Env) {
 
   const failures: string[] = [];
   try {
-    const extraction = parseExtraction(await callGemini(env, input));
-    return json({ provider: "gemini", extraction });
+    const result = await callGemini(env, input);
+    const extraction = parseExtraction(result.text);
+    return json({ provider: "gemini", model: result.model, extraction });
   } catch (error) {
     failures.push(error instanceof Error ? error.message : "Gemini failed");
   }
@@ -136,7 +174,12 @@ export default {
 
     if (!(await authorized(request, env))) return json({ error: "Incorrect team passcode" }, 401);
     if (request.method === "GET" && url.pathname === "/api/status") {
-      return json({ providers: [{ id: "gemini", status: "active" }, { id: "cloudflare", status: "active" }] });
+      return json({
+        providers: [
+          { id: "gemini", status: "active", models: geminiModelOrder(env.GEMINI_MODELS ?? env.GEMINI_MODEL) },
+          { id: "cloudflare", status: "active" },
+        ],
+      });
     }
     if (request.method === "POST" && url.pathname === "/api/extract") return extract(request, env);
     return json({ error: "Not found" }, 404);
