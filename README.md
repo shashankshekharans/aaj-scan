@@ -2,12 +2,14 @@
 
 Turns photos of business cards from events into a HubSpot-ready CSV — free to run, Android PWA, human review before export.
 
+**Live app:** https://aaj-contact-scan.contact-scan.workers.dev
+
 - **Requirements & decisions:** [docs/PRD.md](docs/PRD.md) (approved 2026-10-29)
 - **Evaluation result:** [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) — Gemini primary, Cloudflare fallback, Groq manual-review only.
 
 ## Current status
 
-Status as of 2026-10-31: the installable PWA and unified Cloudflare Worker are built. The app supports passcode access, camera/gallery intake, on-device image preparation, an offline queue, Gemini extraction with Workers AI fallback, review/edit/approval, and HubSpot-ready CSV export. The light-only interface follows AAJ's brand palette and uses Plus Jakarta Sans with Inter.
+Status as of 2026-10-31: the installable PWA and unified Cloudflare Worker are deployed. The app supports passcode access, camera/gallery intake, on-device image preparation, an offline queue, Gemini extraction with Workers AI fallback, review/edit/approval, and HubSpot-ready CSV export. The light-only interface follows AAJ's brand palette and uses Plus Jakarta Sans with Inter.
 
 Gemini uses an automatic model pool. The evaluated `gemini-3.5-flash-lite` model is preferred; quota, rate-limit, capacity, timeout, or model-availability errors rotate to the next configured Gemini model before the app falls back to Cloudflare Workers AI. Configure the order with `GEMINI_MODELS`.
 
@@ -15,9 +17,9 @@ All 20 evaluation cards have verified ground truth. Combined full-frame and crop
 
 ## Next steps
 
-1. Set `TEAM_PASSCODE` and `GEMINI_API_KEY` as Cloudflare Worker secrets.
-2. Deploy the unified Worker and static assets.
-3. Pilot the complete workflow on a small event batch before wider use.
+1. Install the PWA on the marketing team's Android phones.
+2. Pilot the complete workflow on a small event batch.
+3. Review the exported CSV before the first HubSpot import.
 
 Card photos, ground truth and `.env` are git-ignored (personal data / secrets): on another machine, copy them over manually.
 
