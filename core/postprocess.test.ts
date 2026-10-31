@@ -53,10 +53,40 @@ describe("buildCard", () => {
   });
 
   it("flags missing required fields", () => {
-    const e = { ...base, company: null };
+    const e = { ...base, company: null, emails: ["priya.nair@gmail.com"] };
     const r = buildCard(e, ocrFor(e));
     expect(codes(r)).toContain("missing:company");
     expect(r.status).toEqual({ kind: "needs_review" });
+  });
+
+  it("derives a missing company from a business email domain and flags it", () => {
+    const e = { ...base, company: null, emails: ["order@brandict.com"], website: null };
+    const r = buildCard(e, ocrFor(e));
+    expect(r.fields.company).toBe("Brandict");
+    expect(codes(r)).toContain("company_from_email:company");
+    expect(codes(r)).not.toContain("missing:company");
+    expect(r.status).toEqual({ kind: "needs_review" });
+  });
+
+  it("flags a model-supplied company that exactly matches the email domain", () => {
+    const e = { ...base, company: "Craloft", emails: ["ali@craloft.com"], website: null };
+    const r = buildCard(e, "Mansur Ali\nali@craloft.com\nHead - Corporate Sales");
+    expect(r.fields.company).toBe("Craloft");
+    expect(codes(r)).toContain("company_from_email:company");
+    expect(r.status).toEqual({ kind: "needs_review" });
+  });
+
+  it("does not flag a company independently printed as well as used in the email domain", () => {
+    const e = { ...base, company: "Brandict", emails: ["order@brandict.com"], website: null };
+    expect(codes(buildCard(e, ocrFor(e)))).not.toContain("company_from_email:company");
+  });
+
+  it("never derives a company from a personal email domain", () => {
+    const e = { ...base, company: null, emails: ["priya.nair@gmail.com"], website: null };
+    const r = buildCard(e, ocrFor(e));
+    expect(r.fields.company).toBeNull();
+    expect(codes(r)).not.toContain("company_from_email:company");
+    expect(codes(r)).toContain("missing:company");
   });
 
   it("does not flag missing optional fields", () => {
@@ -65,6 +95,19 @@ describe("buildCard", () => {
     expect(r.status).toEqual({ kind: "looks_good" });
     expect(r.fields.jobTitle).toBeNull();
     expect(r.fields.phone).toBeNull();
+  });
+
+  it("accepts a single printed name without requiring a surname", () => {
+    const e = { ...base, full_name: "GURPREET", first_name: "GURPREET", last_name: null };
+    const r = buildCard(e, ocrFor(e));
+    expect(codes(r)).not.toContain("missing:lastName");
+  });
+
+  it("flags a job title when the card names no person", () => {
+    const e = { ...base, full_name: null, first_name: null, last_name: null, job_title: "SALES SUPPORT" };
+    const r = buildCard(e, ocrFor(e));
+    expect(codes(r)).toContain("job_title_without_name:jobTitle");
+    expect(r.status).toEqual({ kind: "needs_review" });
   });
 
   it("prefers the mobile number over the office number", () => {
@@ -113,6 +156,23 @@ describe("buildCard", () => {
     expect(codes(buildCard(e, ocrFor(e)))).toContain("email_domain_mismatch:email");
   });
 
+  it("flags a likely one-character email-domain typo even when it resembles the company", () => {
+    const e = {
+      ...base,
+      company: "JAI AMBAY ARTS",
+      emails: ["info@jalambayarts.com"],
+      website: "www.jaiambayarts.com",
+    };
+    expect(codes(buildCard(e, ocrFor(e)))).toContain("email_domain_mismatch:email");
+  });
+
+  it("requires review when a business email does not resemble the company and no website is present", () => {
+    const e = { ...base, emails: ["info@jalambayarts.com"], website: null };
+    const r = buildCard(e, ocrFor(e));
+    expect(r.flags.find((f) => f.code === "email_domain_mismatch")?.severity).toBe("review");
+    expect(r.status).toEqual({ kind: "needs_review" });
+  });
+
   it("accepts an email that matches the company name even when the website differs", () => {
     // Patterns seen on real cards (fictional values): brand word inside the
     // email domain with a sister-brand website, and .in email vs .com website.
@@ -133,6 +193,17 @@ describe("buildCard", () => {
   it("flags names written with initials", () => {
     const e = { ...base, full_name: "R. K. Sharma", first_name: "R. K.", last_name: "Sharma" };
     expect(codes(buildCard(e, ocrFor(e)))).toContain("name_initials:firstName");
+  });
+
+  it("flags a job title that appears truncated before a printed suffix", () => {
+    const e = { ...base, job_title: "Head" };
+    const r = buildCard(e, ocrFor(e).replace("Head", "Head – Corporate Sales"));
+    expect(codes(r)).toContain("title_may_be_truncated:jobTitle");
+    expect(r.status).toEqual({ kind: "needs_review" });
+  });
+
+  it("does not flag a complete job title", () => {
+    expect(codes(buildCard(base, ocrFor(base)))).not.toContain("title_may_be_truncated:jobTitle");
   });
 
   it("flags long names whose split is uncertain", () => {

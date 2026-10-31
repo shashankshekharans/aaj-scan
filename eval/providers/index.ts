@@ -54,12 +54,16 @@ export const cloudflare: Provider = {
     const headers = { authorization: `Bearer ${env("CF_API_TOKEN")}` };
     const base = {
       temperature: 0,
-      max_tokens: 1024,
+      // Gemma 4 uses part of the completion budget for internal reasoning.
+      // A 1,024-token cap can therefore yield an empty or truncated JSON
+      // answer even though the extraction itself succeeded.
+      max_tokens: 4096,
       messages: [{ role: "user", content: [{ type: "text", text: c.prompt }, { type: "image_url", image_url: { url: dataUrl(c) } }] }],
     };
+    const call = (body: object) => postJson(url, headers, body, 150_000);
     const json = (await withFallback(
-      () => postJson(url, headers, { ...base, response_format: { type: "json_schema", json_schema: c.schema } }),
-      () => postJson(url, headers, base),
+      () => call({ ...base, response_format: { type: "json_schema", json_schema: c.schema } }),
+      () => call(base),
     )) as { result?: { response?: unknown; choices?: unknown } };
     const r = json.result;
     if (r?.choices) return chatText(r);

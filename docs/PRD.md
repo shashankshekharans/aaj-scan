@@ -1,6 +1,6 @@
 # Contact Scan — Discovery Output
 
-Status: **Draft for approval** · Date: 2026-10-29 · No code written yet.
+Status: **Approved; MVP implemented** · Approved 2026-10-29 · Implementation updated 2026-10-31.
 
 Facts marked *(verified 2026-10-29)* were checked against official docs. Anything marked *(unverified)* must be confirmed before or during the build. Accuracy figures are **targets to measure**, not results.
 
@@ -42,7 +42,7 @@ Turn a stack of English business cards into a HubSpot-ready CSV with **under 20 
 | Phone | Optional; mobile preferred, office number dropped if both; exported as printed, no country code added | Phone Number |
 | Event | Entered once per batch | Event Name |
 
-**Never invented:** no guessed emails from website domains, no country code inferred from location, no salutation/gender, no values that are not printed on the card.
+**Never invented:** no guessed emails from website domains, no country code inferred from location, and no salutation/gender. One controlled fallback is allowed: when no company is printed and the card has a non-personal business email, derive the company from the email-domain label and flag it for human confirmation.
 
 ---
 

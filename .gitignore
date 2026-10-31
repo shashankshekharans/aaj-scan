@@ -9,3 +9,9 @@ eval/ground-truth.json
 # Real card photos (personal data) - never commit
 Sample Cards/
 eval/ground-truth-review.md
+tmp/
+
+# Web build and local Worker state
+dist/
+.wrangler/
+.dev.vars*
