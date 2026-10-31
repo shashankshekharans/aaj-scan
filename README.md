@@ -2,20 +2,27 @@
 
 Turns photos of business cards from events into a HubSpot-ready CSV — free to run, Android PWA, human review before export.
 
+**Live app:** https://aaj-contact-scan.contact-scan.workers.dev
+
 - **Requirements & decisions:** [docs/PRD.md](docs/PRD.md) (approved 2026-10-29)
 - **Evaluation result:** [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) — Gemini primary, Cloudflare fallback, Groq manual-review only.
+- **Public template roadmap:** [docs/PUBLIC_TEMPLATE_PLAN.md](docs/PUBLIC_TEMPLATE_PLAN.md) — checklist for finalizing AAJ Scan and publishing a reusable generic edition.
 
 ## Current status
 
-Status as of 2026-10-31: the installable PWA and unified Cloudflare Worker are built. The app supports passcode access, camera/gallery intake, on-device image preparation, an offline queue, Gemini extraction with Workers AI fallback, review/edit/approval, and HubSpot-ready CSV export. The light-only interface follows AAJ's brand palette and uses Plus Jakarta Sans with Inter.
+Status as of 2026-10-31: the installable PWA and unified Cloudflare Worker are deployed. The app supports passcode access, camera/gallery intake, on-device image preparation, an offline queue, Gemini extraction with Workers AI fallback, privacy-safe AI capacity and token indicators, review/edit/approval, and HubSpot-ready CSV export. The light-only interface follows AAJ's brand palette and uses Plus Jakarta Sans with Inter.
+
+Gemini uses an automatic model pool. The evaluated `gemini-3.5-flash-lite` model is preferred; quota, rate-limit, capacity, timeout, or model-availability errors rotate to the next configured Gemini model before the app falls back to Cloudflare Workers AI. Configure the order with `GEMINI_MODELS`.
+
+The AI Capacity panel reports exact completed scans, Gemini-reported tokens, model routing and fallback events stored on the current phone. Provider quota is shown as an estimate only when `VITE_GEMINI_DAILY_LIMIT` is configured from Google AI Studio; provider dashboards remain authoritative. No card or contact data is added to these counters.
 
 All 20 evaluation cards have verified ground truth. Combined full-frame and cropped OCR grounding plus review rules produced zero silent errors for Gemini and Cloudflare. Groq remains manual-review only; Mistral and NVIDIA remain excluded because free API access was unavailable.
 
 ## Next steps
 
-1. Set `TEAM_PASSCODE` and `GEMINI_API_KEY` as Cloudflare Worker secrets.
-2. Deploy the unified Worker and static assets.
-3. Pilot the complete workflow on a small event batch before wider use.
+1. Install the PWA on the marketing team's Android phones.
+2. Pilot the complete workflow on a small event batch.
+3. Review the exported CSV before the first HubSpot import.
 
 Card photos, ground truth and `.env` are git-ignored (personal data / secrets): on another machine, copy them over manually.
 

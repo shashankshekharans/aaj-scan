@@ -11,6 +11,40 @@ const fieldLabels: Record<FieldName, string> = {
   firstName: "First name", lastName: "Last name", company: "Company", email: "Work email", jobTitle: "Job title", phone: "Phone",
 };
 
+interface DeviceUsage {
+  scans: number;
+  geminiScans: number;
+  cloudflareScans: number;
+  tokens: number;
+  fallbacks: number;
+  rateLimitedModels: string[];
+  activeModel: string;
+  state: "healthy" | "fallback" | "limited";
+  estimatedRemaining: number | null;
+}
+
+function summarizeUsage(cards: CardRecord[]): DeviceUsage {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const today = cards.filter((card) => card.provider && (card.completedAt ?? card.createdAt) >= start.getTime());
+  const rateLimitedModels = [...new Set(today.flatMap((card) => card.rateLimitedModels ?? []))];
+  const latest = [...today].sort((a, b) => (b.completedAt ?? b.createdAt) - (a.completedAt ?? a.createdAt))[0];
+  const configuredLimit = Number(import.meta.env.VITE_GEMINI_DAILY_LIMIT ?? 0);
+  const geminiScans = today.filter((card) => card.provider === "gemini").length;
+  const fallbacks = today.filter((card) => card.fallbackUsed).length;
+  return {
+    scans: today.length,
+    geminiScans,
+    cloudflareScans: today.filter((card) => card.provider === "cloudflare").length,
+    tokens: today.reduce((total, card) => total + (card.usageTokens ?? 0), 0),
+    fallbacks,
+    rateLimitedModels,
+    activeModel: latest?.model ?? "gemini-3.5-flash-lite",
+    state: rateLimitedModels.length ? "limited" : fallbacks ? "fallback" : "healthy",
+    estimatedRemaining: Number.isFinite(configuredLimit) && configuredLimit > 0 ? Math.max(configuredLimit - geminiScans, 0) : null,
+  };
+}
+
 function Thumb({ image, alt }: { image: Blob; alt: string }) {
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -36,6 +70,8 @@ export default function App() {
   const [batches, setBatches] = useState<BatchRecord[]>([]);
   const [batch, setBatch] = useState<BatchRecord | null>(null);
   const [cards, setCards] = useState<CardRecord[]>([]);
+  const [usageCards, setUsageCards] = useState<CardRecord[]>([]);
+  const [usageOpen, setUsageOpen] = useState(false);
   const [eventName, setEventName] = useState("");
   const [selected, setSelected] = useState<CardRecord | null>(null);
   const [message, setMessage] = useState("");
@@ -43,6 +79,7 @@ export default function App() {
   const processing = useRef(false);
 
   const refreshBatches = useCallback(async () => setBatches(await db.batches.orderBy("createdAt").reverse().toArray()), []);
+  const refreshUsage = useCallback(async () => setUsageCards(await db.cards.toArray()), []);
   const refreshCards = useCallback(async () => {
     if (!batch) return setCards([]);
     setCards(await db.cards.where("batchId").equals(batch.id).sortBy("createdAt"));
@@ -50,6 +87,7 @@ export default function App() {
 
   useEffect(() => { void refreshBatches(); }, [refreshBatches]);
   useEffect(() => { void refreshCards(); }, [refreshCards]);
+  useEffect(() => { if (unlocked) void refreshUsage(); }, [refreshUsage, unlocked]);
 
   const unlock = async (event?: React.FormEvent) => {
     event?.preventDefault();
@@ -94,6 +132,11 @@ export default function App() {
           await db.cards.update(card.id, {
             state,
             provider: response.provider,
+            model: response.model,
+            usageTokens: response.usage.tokens ?? undefined,
+            fallbackUsed: response.usage.fallbackUsed,
+            rateLimitedModels: response.usage.rateLimitedModels,
+            completedAt: Date.now(),
             fields: result.fields,
             flags: result.flags,
             skipReason: result.status.kind === "skipped" ? result.status.reason : undefined,
@@ -104,13 +147,14 @@ export default function App() {
           if (!offline) break;
         }
         await refreshCards();
+        await refreshUsage();
       }
     } finally {
       await wakeLock?.release();
       processing.current = false;
       await refreshCards();
     }
-  }, [batch, passcode, refreshCards]);
+  }, [batch, passcode, refreshCards, refreshUsage]);
 
   useEffect(() => {
     const resume = () => void processQueue();
@@ -184,6 +228,7 @@ export default function App() {
     clean: cards.filter((card) => card.state === "looks_good").length,
     pending: cards.filter((card) => ["queued", "processing", "error"].includes(card.state)).length,
   }), [cards]);
+  const usage = useMemo(() => summarizeUsage(usageCards), [usageCards]);
 
   if (!unlocked) {
     return <main className="lock-shell">
@@ -213,9 +258,11 @@ export default function App() {
           <button className="button primary" type="submit">Start batch</button>
         </form>
       </section>
+      <CapacityCard usage={usage} onOpen={() => setUsageOpen(true)} />
       {batches.length > 0 && <section className="section"><div className="section-title"><h2>Continue a batch</h2><span>{batches.length} on this phone</span></div>
         <div className="batch-list">{batches.map((item) => <button className="batch-item" key={item.id} onClick={() => setBatch(item)}><span><strong>{item.eventName}</strong><small>{new Date(item.createdAt).toLocaleDateString()}</small></span><span aria-hidden>→</span></button>)}</div>
       </section>}
+      {usageOpen && <UsagePanel usage={usage} onClose={() => setUsageOpen(false)} />}
     </main>;
   }
 
@@ -233,6 +280,7 @@ export default function App() {
         {message && <p className="message">{message}</p>}
       </section>
       <section className="stats-grid"><div><strong>{cards.length}</strong><span>Captured</span></div><div><strong>{counts.pending}</strong><span>Processing</span></div><div><strong>{counts.review}</strong><span>Need checking</span></div></section>
+      <CapacityCard usage={usage} onOpen={() => setUsageOpen(true)} compact />
       {cards.length > 0 && <section className="section"><div className="section-title"><h2>Latest cards</h2><button className="text-button" onClick={() => setScreen("review")}>Review all →</button></div><CardList cards={cards.slice(-4).reverse()} onSelect={setSelected} onRetry={retry} /></section>}
     </>}
 
@@ -252,7 +300,49 @@ export default function App() {
     <nav className="bottom-nav"><button className={screen === "scan" ? "active" : ""} onClick={() => setScreen("scan")}><span>＋</span>Scan</button><button className={screen === "review" ? "active" : ""} onClick={() => setScreen("review")}><span>✓</span>Review</button><button className={screen === "settings" ? "active" : ""} onClick={() => setScreen("settings")}><span>•••</span>Settings</button></nav>
 
     {selected && <CardEditor card={selected} onChange={setSelected} onClose={() => setSelected(null)} onSave={saveSelected} />}
+    {usageOpen && <UsagePanel usage={usage} onClose={() => setUsageOpen(false)} />}
   </main>;
+}
+
+function friendlyModel(model: string) {
+  if (model.startsWith("gemini-")) return model.replace("gemini-", "Gemini ").replaceAll("-", " ");
+  if (model.includes("gemma")) return "Workers AI · Gemma";
+  return model;
+}
+
+function CapacityCard({ usage, onOpen, compact = false }: { usage: DeviceUsage; onOpen(): void; compact?: boolean }) {
+  const labels = { healthy: "Healthy", fallback: "Fallback active", limited: "Limit reached" };
+  const detail = usage.estimatedRemaining !== null
+    ? `~${usage.estimatedRemaining} primary requests left`
+    : `${usage.scans} scan${usage.scans === 1 ? "" : "s"} on this phone today`;
+  return <button className={`capacity-card capacity-${usage.state} ${compact ? "compact" : ""}`} onClick={onOpen}>
+    <span className="capacity-signal" aria-hidden />
+    <span><small>AI capacity</small><strong>{labels[usage.state]}</strong></span>
+    <span className="capacity-detail">{detail}<b aria-hidden>›</b></span>
+  </button>;
+}
+
+function UsagePanel({ usage, onClose }: { usage: DeviceUsage; onClose(): void }) {
+  const routesAvailable = Math.max(3 - usage.rateLimitedModels.length, 0);
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><section className="editor-sheet usage-sheet">
+    <header><div><p className="eyebrow">AI capacity</p><h2>Usage today</h2></div><button className="close-button" onClick={onClose} aria-label="Close">×</button></header>
+    <div className={`capacity-hero capacity-${usage.state}`}><span className="capacity-signal" /><div><small>Current state</small><strong>{usage.state === "healthy" ? "Healthy" : usage.state === "fallback" ? "Fallback active" : "A model limit was reached"}</strong></div></div>
+    <div className="usage-metrics">
+      <div><strong>{usage.scans}</strong><span>Scans on this phone</span></div>
+      <div><strong>{usage.tokens.toLocaleString()}</strong><span>Gemini tokens reported</span></div>
+      <div><strong>{routesAvailable}/3</strong><span>Gemini routes available</span></div>
+      <div><strong>{usage.fallbacks}</strong><span>Fallback events</span></div>
+    </div>
+    <div className="usage-list">
+      <div><span>Active model</span><strong>{friendlyModel(usage.activeModel)}</strong></div>
+      <div><span>Gemini scans</span><strong>{usage.geminiScans}</strong></div>
+      <div><span>Workers AI scans</span><strong>{usage.cloudflareScans}</strong></div>
+      <div><span>Estimated remaining</span><strong>{usage.estimatedRemaining === null ? "Set in AI Studio" : `~${usage.estimatedRemaining}`}</strong></div>
+    </div>
+    {usage.rateLimitedModels.length > 0 && <div className="flag-box"><strong>Rate limit detected</strong><p>{usage.rateLimitedModels.map(friendlyModel).join(", ")} reached a provider limit today. Automatic routing remains enabled.</p></div>}
+    <p className="usage-note">This privacy-safe counter covers this phone only. Provider limits vary by model and project; Google AI Studio and Cloudflare remain the authoritative sources.</p>
+    <button className="button primary" onClick={onClose}>Done</button>
+  </section></div>;
 }
 
 function CardList({ cards, onSelect, onRetry }: { cards: CardRecord[]; onSelect(card: CardRecord): void; onRetry(card: CardRecord): void }) {
