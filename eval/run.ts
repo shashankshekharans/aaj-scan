@@ -6,6 +6,8 @@
 //   npm run eval -- --limit 3             first N cards only (cheap smoke test)
 //   npm run eval -- --fresh               ignore cached model answers
 //   npm run eval -- --no-grounding        skip the OCR cross-check (for comparison)
+//   npm run eval -- --crop-grounding      crop the photo before local OCR only
+//   npm run eval -- --combined-grounding  combine full-frame and cropped OCR
 //   --cards <dir> --truth <file> --results <dir>   override default locations
 //
 // Model answers are cached in eval/results/raw so re-scoring costs no quota.
@@ -53,8 +55,26 @@ interface MethodRun {
 
 /** Same preparation the phone will do: fix rotation, cap size, re-encode (drops EXIF/GPS). */
 async function prepare(file: string) {
-  const buf = await sharp(join(CARDS, file)).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
-  return { buf, base64: buf.toString("base64") };
+  const source = sharp(join(CARDS, file)).rotate();
+  const metadata = await source.metadata();
+  const buf = await source.clone().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+  let ocrBuf = buf;
+  if ((flag("crop-grounding") || flag("combined-grounding")) && metadata.width && metadata.height) {
+    // The evaluation photos consistently place either a horizontal or
+    // vertical card in the lower-central region. Keep a generous region so
+    // the crop removes background without clipping either orientation.
+    const left = Math.floor(metadata.width * 0.08);
+    const top = Math.floor(metadata.height * 0.15);
+    const width = Math.floor(metadata.width * 0.84);
+    const height = Math.floor(metadata.height * 0.70);
+    ocrBuf = await source.clone()
+      .extract({ left, top, width, height })
+      .resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true })
+      .sharpen()
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  }
+  return { buf, ocrBuf, base64: buf.toString("base64") };
 }
 
 async function main() {
@@ -73,7 +93,8 @@ async function main() {
   const missing = PROVIDERS.filter((p) => !configured.includes(p)).map((p) => `${p.id} (needs ${p.requiredEnv.join(", ")})`);
   if (missing.length) console.warn(`Not configured, skipped: ${missing.join("; ")}\n`);
 
-  for (const d of ["ocr", "raw", ...providers.map((p) => join("raw", p.id))]) mkdirSync(join(RESULTS, d), { recursive: true });
+  const ocrCacheDirs = flag("combined-grounding") ? ["ocr", "ocr-cropped"] : [flag("crop-grounding") ? "ocr-cropped" : "ocr"];
+  for (const d of [...ocrCacheDirs, "raw", ...providers.map((p) => join("raw", p.id))]) mkdirSync(join(RESULTS, d), { recursive: true });
 
   // 1. Prepare images and OCR once per card (cached).
   const prepared = new Map<string, Awaited<ReturnType<typeof prepare>>>();
@@ -83,13 +104,17 @@ async function main() {
   for (const f of files) {
     const img = await prepare(f);
     prepared.set(f, img);
-    const cache = join(RESULTS, "ocr", `${f}.txt`);
-    if (existsSync(cache) && !flag("fresh")) ocr.set(f, readFileSync(cache, "utf8"));
-    else {
-      const { data } = await worker.recognize(img.buf);
-      writeFileSync(cache, data.text);
-      ocr.set(f, data.text);
+    const texts: string[] = [];
+    for (const dir of ocrCacheDirs) {
+      const cache = join(RESULTS, dir, `${f}.txt`);
+      if (existsSync(cache) && !flag("fresh")) texts.push(readFileSync(cache, "utf8"));
+      else {
+        const { data } = await worker.recognize(dir === "ocr-cropped" ? img.ocrBuf : img.buf);
+        writeFileSync(cache, data.text);
+        texts.push(data.text);
+      }
     }
+    ocr.set(f, texts.join("\n"));
   }
   await worker.terminate();
   console.log(`OCR done for ${files.length} cards.`);

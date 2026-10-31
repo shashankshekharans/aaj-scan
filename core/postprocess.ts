@@ -1,5 +1,6 @@
 // Turns a model Extraction into an exportable contact plus review flags.
-// Rules only — nothing here may add information that is not on the card.
+// Deterministic fallbacks are allowed only when their source is on the card
+// and the resulting field is explicitly flagged for human review.
 
 import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 import { isOnCard } from "./grounding";
@@ -38,8 +39,63 @@ function hostOf(website: string | null): string | null {
 
 const domainOf = (email: string) => email.toLowerCase().split("@")[1] ?? "";
 
+function companyFromEmail(email: string | null): string | null {
+  if (!email || !EMAIL_RE.test(email)) return null;
+  const domain = domainOf(email);
+  if (PERSONAL_DOMAINS.has(domain)) return null;
+  const label = domain.split(".")[0]?.trim();
+  if (!label || label.length < 2) return null;
+  const company = label
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((word) => word[0]!.toUpperCase() + word.slice(1))
+    .join(" ");
+  return company || null;
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function flagCompanyFromEmail(company: string | null, email: string | null, e: Extraction, ocrText: string | null, flags: Flag[]) {
+  const domainCompany = companyFromEmail(email);
+  if (!company || !domainCompany || alnum(company) !== alnum(domainCompany)) return;
+  if (ocrText) {
+    const nonCompanySources = [...e.emails, e.website].filter((v): v is string => !!v);
+    const independentText = nonCompanySources.reduce(
+      (text, value) => text.replace(new RegExp(escapeRegExp(value), "gi"), " "),
+      ocrText,
+    );
+    if (isOnCard(company, independentText, "text")) return;
+  }
+  flags.push({
+    code: "company_from_email",
+    field: "company",
+    severity: "review",
+    message: `Company matches the email domain (${domainOf(email!)}) — confirm the name`,
+  });
+}
+
 function sameSite(a: string, b: string) {
   return a === b || a.endsWith("." + b) || b.endsWith("." + a);
+}
+
+function oneEditApart(a: string, b: string): boolean {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false;
+  if (a.length > b.length) return oneEditApart(b, a);
+  let edits = 0;
+  for (let i = 0, j = 0; i < a.length || j < b.length;) {
+    if (a[i] === b[j]) {
+      i++;
+      j++;
+    } else if (++edits > 1) {
+      return false;
+    } else if (a.length === b.length) {
+      i++;
+      j++;
+    } else {
+      j++;
+    }
+  }
+  return edits === 1;
 }
 
 const GENERIC_WORDS = new Set(["private", "limited", "india", "group", "company", "corporation", "industries", "solutions", "technologies", "services", "enterprises", "international", "trading", "home", "homes"]);
@@ -80,14 +136,24 @@ function pickEmail(e: Extraction, company: string | null, site: string | null, f
   const domain = domainOf(chosen);
   if (PERSONAL_DOMAINS.has(domain)) {
     flags.push({ code: "personal_email", field: "email", severity: "info", message: "Personal email address" });
-  } else if ((site && sameSite(domain, site)) || domainMatchesCompany(domain, company)) {
+  } else if (site && sameSite(domain, site)) {
     // Consistent with the card.
+  } else if (site && oneEditApart(domain, site)) {
+    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: `Email domain is one character different from the website (${site}) — check for a typo` });
+  } else if (domainMatchesCompany(domain, company)) {
+    // A distinct company-related domain may legitimately differ from the website.
   } else if (site) {
     flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: `Email domain differs from website (${site}) and company name` });
-  } else {
-    flags.push({ code: "email_domain_mismatch", field: "email", severity: "info", message: "Email domain does not resemble the company name" });
+  } else if (company) {
+    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: "Email domain does not resemble the company name — check the address" });
   }
   return chosen;
+}
+
+function titleMayBeTruncated(title: string, ocrText: string): boolean {
+  const titlePattern = escapeRegExp(title).replace(/\\\s+/g, "\\s+");
+  const continuation = new RegExp(`(?:^|\\s)${titlePattern}\\s*(?:[-–—]|\\()\\s*\\S`, "i");
+  return ocrText.split(/\\r?\\n/).some((line) => continuation.test(line));
 }
 
 function isMobile(p: { number: string; type: string }) {
@@ -144,20 +210,42 @@ function pickName(e: Extraction, flags: Flag[]) {
 
 export function buildCard(e: Extraction, ocrText: string | null): CardResult {
   const flags: Flag[] = [];
-  const company = clean(e.company);
+  const printedCompany = clean(e.company);
   const site = hostOf(clean(e.website));
   const { first, last } = pickName(e, flags);
+  const email = pickEmail(e, printedCompany, site, flags);
+  const company = printedCompany ?? companyFromEmail(email);
+  flagCompanyFromEmail(company, email, e, ocrText, flags);
 
   const fields: ContactFields = {
     firstName: first,
     lastName: last,
     company,
-    email: pickEmail(e, company, site, flags),
+    email,
     jobTitle: clean(e.job_title),
     phone: pickPhone(e, flags),
   };
 
+  if (fields.jobTitle && !fields.firstName && !fields.lastName) {
+    flags.push({
+      code: "job_title_without_name",
+      field: "jobTitle",
+      severity: "review",
+      message: "Job title found without a named person — confirm whether it is a role label",
+    });
+  }
+
+  if (fields.jobTitle && ocrText && titleMayBeTruncated(fields.jobTitle, ocrText)) {
+    flags.push({
+      code: "title_may_be_truncated",
+      field: "jobTitle",
+      severity: "review",
+      message: "The card text appears to continue after the extracted job title — check the full title",
+    });
+  }
+
   for (const f of REQUIRED_FIELDS) {
+    if (f === "lastName" && fields.firstName) continue;
     if (!fields[f]) flags.push({ code: "missing", field: f, severity: "review", message: "Required field missing" });
   }
 

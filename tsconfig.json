@@ -8,8 +8,10 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["node"],
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["node", "vite/client", "@cloudflare/workers-types"],
     "noEmit": true
   },
-  "include": ["core", "eval"]
+  "include": ["core", "eval", "src", "worker", "vite.config.ts"]
 }

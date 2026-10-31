@@ -34,12 +34,15 @@ export type FlagCode =
   | "missing"
   | "invalid_email"
   | "email_domain_mismatch"
+  | "company_from_email"
   | "personal_email"
   | "multiple_emails"
   | "multiple_phones"
   | "phone_unverified"
   | "name_initials"
   | "name_split_uncertain"
+  | "job_title_without_name"
+  | "title_may_be_truncated"
   | "not_on_card"
   | "ocr_only";
 

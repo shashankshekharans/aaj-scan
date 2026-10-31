@@ -22,6 +22,8 @@ npm run eval -- --limit 3          # cheap smoke test on 3 cards
 npm run eval                       # all cards, all configured providers + OCR-only
 npm run eval -- --methods gemini   # one provider
 npm run eval -- --no-grounding     # turn off the OCR cross-check, to measure what it adds
+npm run eval -- --crop-grounding   # crop the card region before local OCR
+npm run eval -- --combined-grounding # combine full-frame and cropped OCR
 ```
 
 Reports go to `eval/results/report-<time>.md`. Model answers are cached, so re-running costs no quota (`--fresh` forces new calls).
