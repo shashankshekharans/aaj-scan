@@ -16,6 +16,11 @@ export interface CardRecord {
   image: Blob;
   state: CardState;
   provider?: string;
+  model?: string;
+  usageTokens?: number;
+  fallbackUsed?: boolean;
+  rateLimitedModels?: string[];
+  completedAt?: number;
   fields?: ContactFields;
   flags?: Flag[];
   skipReason?: SkipReason;

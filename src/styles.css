@@ -67,6 +67,18 @@ input:focus { border-color: var(--red); box-shadow: 0 0 0 4px rgba(194,32,40,.08
 .capture-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 26px; }
 .message { margin: 16px 0 0 !important; font-size: .84rem; }
 
+.capacity-card { width: calc(100% - 36px); margin: 18px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--white); display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 11px; text-align: left; cursor: pointer; box-shadow: 0 8px 24px rgba(44,44,44,.05); transition: transform .18s, box-shadow .18s; }
+.capacity-card:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(44,44,44,.08); }
+.capacity-card.compact { margin-top: 0; }
+.capacity-card > span:nth-child(2) { display: grid; gap: 2px; }
+.capacity-card small, .capacity-hero small { color: var(--muted); font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.capacity-card strong { font-size: .88rem; }
+.capacity-signal { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 5px rgba(204,164,59,.15); }
+.capacity-limited .capacity-signal { background: var(--red); box-shadow: 0 0 0 5px rgba(194,32,40,.12); }
+.capacity-fallback .capacity-signal { background: var(--jet); box-shadow: 0 0 0 5px rgba(44,44,44,.1); }
+.capacity-detail { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .72rem; }
+.capacity-detail b { color: var(--red); font-size: 1.25rem; line-height: 1; }
+
 .section { padding: 28px 18px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
 .section-title h1 { font-size: 2.4rem; margin-bottom: 0; }
@@ -130,6 +142,20 @@ input:focus { border-color: var(--red); box-shadow: 0 0 0 4px rgba(194,32,40,.08
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
 .field-grid label:nth-child(3), .field-grid label:nth-child(4), .field-grid label:nth-child(5) { grid-column: 1 / -1; }
 .editor-actions { position: sticky; bottom: -22px; background: var(--white); display: grid; grid-template-columns: 1fr 1.5fr; gap: 10px; padding: 18px 0 0; margin-top: 18px; }
+.usage-sheet { display: grid; gap: 17px; }
+.capacity-hero { padding: 17px; border: 1px solid var(--line); border-radius: 16px; display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, #fff, var(--cultured)); }
+.capacity-hero > div { display: grid; gap: 3px; }
+.capacity-hero strong { font-family: "Plus Jakarta Sans Variable", sans-serif; font-size: 1.08rem; }
+.usage-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.usage-metrics > div { min-height: 98px; padding: 15px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); display: grid; align-content: center; gap: 4px; }
+.usage-metrics strong { font-family: "Plus Jakarta Sans Variable", sans-serif; color: var(--red); font-size: 1.45rem; }
+.usage-metrics span { color: var(--muted); font-size: .68rem; line-height: 1.35; }
+.usage-list { border: 1px solid var(--line); border-radius: 15px; overflow: hidden; }
+.usage-list > div { min-height: 47px; padding: 10px 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--white); border-bottom: 1px solid var(--line); }
+.usage-list > div:last-child { border-bottom: 0; }
+.usage-list span { color: var(--muted); font-size: .75rem; }
+.usage-list strong { max-width: 58%; text-align: right; font-size: .76rem; text-transform: capitalize; }
+.usage-note { color: var(--muted); font-size: .7rem; line-height: 1.5; margin: 0; }
 
 @media (min-width: 761px) {
   body { background: linear-gradient(135deg, var(--cultured), var(--blush)); }
@@ -143,6 +169,7 @@ input:focus { border-color: var(--red); box-shadow: 0 0 0 4px rgba(194,32,40,.08
   .field-grid { grid-template-columns: 1fr; }
   .field-grid label { grid-column: 1 !important; }
   .export-panel { align-items: stretch; flex-direction: column; }
+  .capacity-detail { max-width: 116px; text-align: right; }
 }
 
 @media (prefers-reduced-motion: reduce) {

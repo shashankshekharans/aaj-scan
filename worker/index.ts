@@ -47,11 +47,14 @@ async function authorized(request: Request, env: Env) {
   return supplied.length > 0 && sameSecret(supplied, env.TEAM_PASSCODE);
 }
 
-function readGeminiText(value: unknown): string {
-  const response = value as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+function readGeminiResult(value: unknown) {
+  const response = value as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    usageMetadata?: { totalTokenCount?: number };
+  };
   const text = response.candidates?.[0]?.content?.parts?.map((part) => part.text ?? "").join("");
   if (!text) throw new Error("Gemini returned no extraction");
-  return text;
+  return { text, tokens: response.usageMetadata?.totalTokenCount ?? null };
 }
 
 async function callGeminiModel(env: Env, input: ExtractRequest, model: string) {
@@ -84,21 +87,28 @@ async function callGeminiModel(env: Env, input: ExtractRequest, model: string) {
     throw new Error(`Gemini ${model} retry limit reached`);
   };
   try {
-    return readGeminiText(await request({ responseMimeType: "application/json", responseJsonSchema: EXTRACTION_SCHEMA, temperature: 0 }));
+    return readGeminiResult(await request({ responseMimeType: "application/json", responseJsonSchema: EXTRACTION_SCHEMA, temperature: 0 }));
   } catch (error) {
     if (!(error instanceof GeminiHttpError) || error.status !== 400) throw error;
-    return readGeminiText(await request({ responseMimeType: "application/json", temperature: 0 }));
+    return readGeminiResult(await request({ responseMimeType: "application/json", temperature: 0 }));
   }
 }
 
-async function callGemini(env: Env, input: ExtractRequest) {
+interface RoutingTrace {
+  attemptedModels: string[];
+  rateLimitedModels: string[];
+}
+
+async function callGemini(env: Env, input: ExtractRequest, trace: RoutingTrace) {
   const configured = env.GEMINI_MODELS ?? env.GEMINI_MODEL;
   const failures: string[] = [];
   for (const model of geminiModelOrder(configured)) {
+    trace.attemptedModels.push(model);
     try {
-      return { text: await callGeminiModel(env, input, model), model };
+      return { ...(await callGeminiModel(env, input, model)), model };
     } catch (error) {
       failures.push(error instanceof Error ? error.message : `${model} failed`);
+      if (error instanceof GeminiHttpError && error.status === 429) trace.rateLimitedModels.push(model);
       if (!shouldRotateGeminiModel(error)) throw error;
     }
   }
@@ -123,9 +133,9 @@ async function callCloudflare(env: Env, input: ExtractRequest) {
     messages: [{ role: "user", content: [{ type: "text", text: EXTRACTION_PROMPT }, { type: "image_url", image_url: { url: dataUrl } }] }],
   };
   try {
-    return readCloudflareText(await env.AI.run(model, { ...base, response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA } }));
+    return { text: readCloudflareText(await env.AI.run(model, { ...base, response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA } })), model };
   } catch {
-    return readCloudflareText(await env.AI.run(model, base));
+    return { text: readCloudflareText(await env.AI.run(model, base)), model };
   }
 }
 
@@ -149,17 +159,29 @@ async function extract(request: Request, env: Env) {
   }
 
   const failures: string[] = [];
+  const routing: RoutingTrace = { attemptedModels: [], rateLimitedModels: [] };
   try {
-    const result = await callGemini(env, input);
+    const result = await callGemini(env, input, routing);
     const extraction = parseExtraction(result.text);
-    return json({ provider: "gemini", model: result.model, extraction });
+    return json({
+      provider: "gemini",
+      model: result.model,
+      extraction,
+      usage: { tokens: result.tokens, ...routing, fallbackUsed: routing.attemptedModels.length > 1 },
+    });
   } catch (error) {
     failures.push(error instanceof Error ? error.message : "Gemini failed");
   }
 
   try {
-    const extraction = parseExtraction(await callCloudflare(env, input));
-    return json({ provider: "cloudflare", extraction });
+    const result = await callCloudflare(env, input);
+    const extraction = parseExtraction(result.text);
+    return json({
+      provider: "cloudflare",
+      model: result.model,
+      extraction,
+      usage: { tokens: null, ...routing, fallbackUsed: true },
+    });
   } catch (error) {
     failures.push(error instanceof Error ? error.message : "Workers AI failed");
   }
