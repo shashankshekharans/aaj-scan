@@ -1,6 +1,6 @@
 # AAJ Contact Scan → Public Template Plan
 
-Status: **Planned**  
+Status: **Planned**
 Recorded: **2026-10-31**
 
 This document preserves the agreed plan for finishing the private AAJ Contact Scan application and producing a separate, reusable public Contact Scan template. It is the project checklist and should be updated as work is completed.
