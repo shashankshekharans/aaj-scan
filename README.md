@@ -6,6 +6,7 @@ Turns photos of business cards from events into a HubSpot-ready CSV — free to 
 
 - **Requirements & decisions:** [docs/PRD.md](docs/PRD.md) (approved 2026-10-29)
 - **Evaluation result:** [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) — Gemini primary, Cloudflare fallback, Groq manual-review only.
+- **Public template roadmap:** [docs/PUBLIC_TEMPLATE_PLAN.md](docs/PUBLIC_TEMPLATE_PLAN.md) — checklist for finalizing AAJ Scan and publishing a reusable generic edition.
 
 ## Current status
 
