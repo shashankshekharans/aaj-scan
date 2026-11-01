@@ -1,32 +1,30 @@
 # AAJ Contact Scan → Public Template Plan
 
-Status: **Planned**
+Status: **AAJ application deployed with shared D1 usage; pilot and public template remain**
 Recorded: **2026-10-31**
+Last updated: **2026-11-01**
 
 This document preserves the agreed plan for finishing the private AAJ Contact Scan application and producing a separate, reusable public Contact Scan template. It is the project checklist and should be updated as work is completed.
 
 ## Next Session — Start Here
 
-**First task:** upgrade the live AI Capacity indicator from per-phone counters to shared totals across all team phones using Cloudflare D1.
+**First task:** run a two-phone live pilot, confirm shared D1 usage increments correctly, and review the resulting CSV before any HubSpot import.
 
-Before resuming, update the `AAJ Contact Scan Deploy` Cloudflare API token with:
+Also confirm the current Gemini per-model limits in Google AI Studio before configuring `GEMINI_DAILY_LIMITS`; do not display an estimated remaining count based on an unverified quota.
 
-- **Account → D1 → Edit**
+Completed on 2026-11-01:
 
-Keep the existing **Workers Scripts → Edit** and **Workers AI → Read** permissions. If Cloudflare issues a replacement token value, update `CF_API_TOKEN` in the local `.env` file and never paste it into chat.
-
-Implementation sequence:
-
-1. Create the `aaj-contact-scan-usage` D1 database.
-2. Add a privacy-safe usage schema containing timestamps, provider/model identifiers, token totals and statuses only.
-3. Bind D1 to the Worker and apply the migration.
-4. Upgrade `/api/usage` and the AI Capacity panel to show shared team totals.
-5. Store no card images, names, emails, phone numbers or extracted contacts in D1.
-6. Test across multiple devices, deploy, and sync the completed change to GitHub.
+- Created `aaj-contact-scan-usage` and applied the privacy-safe schema.
+- Bound D1 to the Worker and added authenticated shared usage reporting.
+- Kept card images and extracted contact information out of D1.
+- Added a resilient on-device usage fallback.
+- Integrated the premium light-mode UI and transparent AAJ brand logo.
+- Deployed and verified the live Worker, then synced GitHub `main`.
+- Renamed the production Worker to `aaj`; the canonical live URL is `https://aaj.contact-scan.workers.dev/`.
 
 ## 1. Finalize AAJ Contact Scan
 
-- [ ] Complete the premium light-mode interface.
+- [x] Complete the premium light-mode interface.
 - [ ] Review mobile layouts on the Android phones used by the marketing team.
 - [ ] Confirm camera capture, gallery upload, review, correction and CSV export flows.
 - [ ] Pilot the complete workflow with a small real event batch.
@@ -34,6 +32,19 @@ Implementation sequence:
 - [ ] Resolve issues discovered during the pilot.
 - [ ] Tag the approved stable version as `v1.0.0`.
 - [ ] Make the `aaj-scan` repository private.
+
+### Shared AI Capacity
+
+- [x] Create and bind the Cloudflare D1 usage database.
+- [x] Store privacy-safe provider/model/status/token metadata only.
+- [x] Protect `/api/usage` with the team passcode.
+- [x] Show shared totals with a local-device fallback.
+- [x] Deploy and verify authenticated and unauthenticated endpoints.
+- [ ] Verify aggregation with live scans from at least two phones.
+- [ ] Confirm Gemini model quotas and configure `GEMINI_DAILY_LIMITS`.
+- [ ] Add remaining client tests for shared-preference and local-fallback selection.
+- [ ] Update `.env.example` and README with D1, quota and key-rotation instructions.
+- [ ] Rename local Cloudflare variables to `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
 Making the repository private will not disable the deployed Cloudflare Worker. If Cloudflare Git-based automatic deployment is enabled later, Cloudflare must be granted access to the private repository.
 

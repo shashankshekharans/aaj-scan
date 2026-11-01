@@ -2,7 +2,7 @@
 
 Turns photos of business cards from events into a HubSpot-ready CSV — free to run, Android PWA, human review before export.
 
-**Live app:** https://aaj-contact-scan.contact-scan.workers.dev
+**Live app:** https://aaj.contact-scan.workers.dev
 
 - **Requirements & decisions:** [docs/PRD.md](docs/PRD.md) (approved 2026-10-29)
 - **Evaluation result:** [docs/EVALUATION_RESULTS.md](docs/EVALUATION_RESULTS.md) — Gemini primary, Cloudflare fallback, Groq manual-review only.

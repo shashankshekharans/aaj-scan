@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "aaj-contact-scan",
+  "name": "aaj",
   "main": "worker/index.ts",
   "workers_dev": true,
   "preview_urls": false,
@@ -12,6 +12,14 @@
     "run_worker_first": ["/api/*"]
   },
   "ai": { "binding": "AI" },
+  "d1_databases": [
+    {
+      "binding": "USAGE_DB",
+      "database_name": "aaj-contact-scan-usage",
+      "database_id": "a9f1e035-e9ee-4a82-b02b-9748af07b63e",
+      "migrations_dir": "migrations"
+    }
+  ],
   "secrets": { "required": ["TEAM_PASSCODE", "GEMINI_API_KEY"] },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }

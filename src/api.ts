@@ -8,6 +8,20 @@ export interface ExtractionUsage {
   fallbackUsed: boolean;
 }
 
+export interface SharedUsage {
+  source: "shared" | "unavailable";
+  scans: number;
+  geminiScans: number;
+  cloudflareScans: number;
+  tokens: number;
+  fallbacks: number;
+  rateLimitedModels: string[];
+  activeModel: string | null;
+  state: "healthy" | "fallback" | "limited";
+  estimatedRemaining: number | null;
+  updatedAt: number | null;
+}
+
 async function request<T>(path: string, passcode: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -20,6 +34,8 @@ async function request<T>(path: string, passcode: string, init?: RequestInit): P
 
 export const checkPasscode = (passcode: string) =>
   request<{ providers: { id: string; status: string }[] }>("/api/status", passcode);
+
+export const getUsage = (passcode: string) => request<SharedUsage>("/api/usage", passcode);
 
 export async function extractCard(image: Blob, passcode: string) {
   return request<{ provider: string; model: string; usage: ExtractionUsage; extraction: Extraction }>("/api/extract", passcode, {

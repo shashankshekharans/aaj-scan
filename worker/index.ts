@@ -7,6 +7,13 @@ import {
   shouldRetryGemini,
   shouldRotateGeminiModel,
 } from "./gemini-routing";
+import {
+  parseUsageLimits,
+  readUsageSnapshot,
+  recordUsageEvents,
+  type UsageDatabase,
+  type UsageEvent,
+} from "./usage";
 
 interface Env {
   ASSETS: Fetcher;
@@ -16,6 +23,8 @@ interface Env {
   GEMINI_MODEL?: string;
   GEMINI_MODELS?: string;
   CF_MODEL?: string;
+  GEMINI_DAILY_LIMITS?: string;
+  USAGE_DB: UsageDatabase;
 }
 
 interface ExtractRequest {
@@ -150,7 +159,7 @@ async function parseRequest(request: Request): Promise<ExtractRequest> {
   return body as ExtractRequest;
 }
 
-async function extract(request: Request, env: Env) {
+async function extract(request: Request, env: Env, context?: ExecutionContext) {
   let input: ExtractRequest;
   try {
     input = await parseRequest(request);
@@ -160,9 +169,29 @@ async function extract(request: Request, env: Env) {
 
   const failures: string[] = [];
   const routing: RoutingTrace = { attemptedModels: [], rateLimitedModels: [] };
+  const scanId = crypto.randomUUID();
+  const events: UsageEvent[] = [];
+  const saveUsage = () => {
+    if (!events.length) return;
+    const write = recordUsageEvents(env.USAGE_DB, events).catch(() => undefined);
+    context?.waitUntil(write);
+  };
   try {
     const result = await callGemini(env, input, routing);
     const extraction = parseExtraction(result.text);
+    const occurredAt = Date.now();
+    for (const model of routing.attemptedModels) {
+      events.push({
+        scanId,
+        occurredAt,
+        provider: "gemini",
+        model,
+        status: model === result.model ? "success" : routing.rateLimitedModels.includes(model) ? "rate_limited" : "error",
+        tokens: model === result.model ? result.tokens : null,
+        fallbackUsed: routing.attemptedModels.length > 1,
+      });
+    }
+    saveUsage();
     return json({
       provider: "gemini",
       model: result.model,
@@ -176,6 +205,20 @@ async function extract(request: Request, env: Env) {
   try {
     const result = await callCloudflare(env, input);
     const extraction = parseExtraction(result.text);
+    const occurredAt = Date.now();
+    for (const model of routing.attemptedModels) {
+      events.push({
+        scanId,
+        occurredAt,
+        provider: "gemini",
+        model,
+        status: routing.rateLimitedModels.includes(model) ? "rate_limited" : "error",
+        tokens: null,
+        fallbackUsed: true,
+      });
+    }
+    events.push({ scanId, occurredAt, provider: "cloudflare", model: result.model, status: "success", tokens: null, fallbackUsed: true });
+    saveUsage();
     return json({
       provider: "cloudflare",
       model: result.model,
@@ -184,13 +227,35 @@ async function extract(request: Request, env: Env) {
     });
   } catch (error) {
     failures.push(error instanceof Error ? error.message : "Workers AI failed");
+    const occurredAt = Date.now();
+    for (const model of routing.attemptedModels) {
+      events.push({
+        scanId,
+        occurredAt,
+        provider: "gemini",
+        model,
+        status: routing.rateLimitedModels.includes(model) ? "rate_limited" : "error",
+        tokens: null,
+        fallbackUsed: true,
+      });
+    }
+    events.push({
+      scanId,
+      occurredAt,
+      provider: "cloudflare",
+      model: env.CF_MODEL ?? "@cf/google/gemma-4-26b-a4b-it",
+      status: "error",
+      tokens: null,
+      fallbackUsed: true,
+    });
+    saveUsage();
   }
 
   return json({ error: "All extraction providers are temporarily unavailable", providers: failures }, 503);
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, context?: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
 
@@ -203,7 +268,12 @@ export default {
         ],
       });
     }
-    if (request.method === "POST" && url.pathname === "/api/extract") return extract(request, env);
+    if (request.method === "GET" && url.pathname === "/api/usage") {
+      return json(await readUsageSnapshot(env.USAGE_DB, {
+        limits: parseUsageLimits(env.GEMINI_DAILY_LIMITS),
+      }));
+    }
+    if (request.method === "POST" && url.pathname === "/api/extract") return extract(request, env, context);
     return json({ error: "Not found" }, 404);
   },
 } satisfies ExportedHandler<Env>;
