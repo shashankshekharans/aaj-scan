@@ -1,3 +1,4 @@
+import { BackupValidationError, listBackupEvents, readBackupCsv, upsertBackupContact, type BackupDatabase } from "./backup";
 import { parseExtraction } from "../core/extraction";
 import { EXTRACTION_PROMPT, EXTRACTION_SCHEMA } from "../core/prompt";
 import {
@@ -25,6 +26,8 @@ interface Env {
   CF_MODEL?: string;
   GEMINI_DAILY_LIMITS?: string;
   USAGE_DB: UsageDatabase;
+  BACKUP_DB: BackupDatabase;
+  BACKUP_ADMIN_PASSCODE: string;
 }
 
 interface ExtractRequest {
@@ -254,26 +257,133 @@ async function extract(request: Request, env: Env, context?: ExecutionContext) {
   return json({ error: "All extraction providers are temporarily unavailable", providers: failures }, 503);
 }
 
-export default {
-  async fetch(request: Request, env: Env, context?: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url);
-    if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+export interface AdminAuthLimiter {
+  failed(request: Request): Promise<void>;
+}
 
-    if (!(await authorized(request, env))) return json({ error: "Incorrect team passcode" }, 401);
-    if (request.method === "GET" && url.pathname === "/api/status") {
-      return json({
-        providers: [
-          { id: "gemini", status: "active", models: geminiModelOrder(env.GEMINI_MODELS ?? env.GEMINI_MODEL) },
-          { id: "cloudflare", status: "active" },
-        ],
-      });
+// Best-effort friction within one isolate, not a globally durable rate limit.
+// The bounded injectable seam can be replaced by a durable deployment limiter.
+export function createAdminAuthLimiter(options: {
+  now?: () => number;
+  sleep?: (milliseconds: number) => Promise<void>;
+} = {}): AdminAuthLimiter {
+  const now = options.now ?? Date.now;
+  const sleep = options.sleep ?? ((milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+  const failures = new Map<string, { count: number; startedAt: number }>();
+  return {
+    async failed(request) {
+      const key = (request.headers.get("cf-connecting-ip") ?? "unknown").slice(0, 64);
+      const time = now();
+      const previous = failures.get(key);
+      const entry = previous && time - previous.startedAt < 60_000
+        ? { count: Math.min(previous.count + 1, 9), startedAt: previous.startedAt }
+        : { count: 1, startedAt: time };
+      failures.delete(key);
+      if (failures.size >= 1024) failures.delete(failures.keys().next().value!);
+      failures.set(key, entry);
+      const delay = Math.min(2000, (entry.count - 1) * 250);
+      if (delay) await sleep(delay);
+    },
+  };
+}
+
+async function backupRequestBody(request: Request): Promise<unknown> {
+  const maxBytes = 32_768;
+  if (Number(request.headers.get("content-length")) > maxBytes || !request.body) throw new BackupValidationError();
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytes = 0;
+  let body = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > maxBytes) {
+        await reader.cancel();
+        throw new BackupValidationError();
+      }
+      body += decoder.decode(value, { stream: true });
     }
-    if (request.method === "GET" && url.pathname === "/api/usage") {
-      return json(await readUsageSnapshot(env.USAGE_DB, {
-        limits: parseUsageLimits(env.GEMINI_DAILY_LIMITS),
-      }));
+    return JSON.parse(body + decoder.decode()) as unknown;
+  } catch {
+    throw new BackupValidationError();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function adminBackup(request: Request, env: Env, url: URL) {
+  try {
+    if (request.method === "GET" && url.pathname === "/api/admin/backups") {
+      const limit = url.searchParams.has("limit") ? Number(url.searchParams.get("limit")) : undefined;
+      const cursor = url.searchParams.get("cursor") ?? undefined;
+      return json(await listBackupEvents(env.BACKUP_DB, { limit, cursor }));
     }
-    if (request.method === "POST" && url.pathname === "/api/extract") return extract(request, env, context);
+    const match = /^\/api\/admin\/backups\/([^/]+)\.csv$/.exec(url.pathname);
+    if (request.method === "GET" && match) {
+      const csv = await readBackupCsv(env.BACKUP_DB, match[1]!);
+      if (!csv) return json({ error: "Backup event not found" }, 404);
+      return new Response(csv.content, { headers: {
+        "content-type": "text/csv; charset=utf-8",
+        "content-disposition": `attachment; filename="${csv.filename}"`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      } });
+    }
     return json({ error: "Not found" }, 404);
-  },
-} satisfies ExportedHandler<Env>;
+  } catch (error) {
+    return error instanceof BackupValidationError
+      ? json({ error: "Invalid backup request" }, 400)
+      : json({ error: "Cloud backups are temporarily unavailable" }, 503);
+  }
+}
+
+export function createWorker(options: { now?: () => number; adminAuthLimiter?: AdminAuthLimiter } = {}) {
+  const now = options.now ?? Date.now;
+  const adminAuthLimiter = options.adminAuthLimiter ?? createAdminAuthLimiter({ now });
+  return {
+    async fetch(request: Request, env: Env, context?: ExecutionContext): Promise<Response> {
+      const url = new URL(request.url);
+      if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
+
+      // Administrator routes are authenticated before the ordinary team guard.
+      // Team credentials never grant backup read access.
+      if (url.pathname.startsWith("/api/admin/")) {
+        const supplied = request.headers.get("x-admin-passcode") ?? "";
+        if (!supplied || !env.BACKUP_ADMIN_PASSCODE || !(await sameSecret(supplied, env.BACKUP_ADMIN_PASSCODE))) {
+          await adminAuthLimiter.failed(request);
+          return json({ error: "Incorrect administrator passcode" }, 401);
+        }
+        return adminBackup(request, env, url);
+      }
+      if (!(await authorized(request, env))) return json({ error: "Incorrect team passcode" }, 401);
+      if (request.method === "POST" && url.pathname === "/api/backup/contacts") {
+        try {
+          return json(await upsertBackupContact(env.BACKUP_DB, await backupRequestBody(request), now()));
+        } catch (error) {
+          return error instanceof BackupValidationError
+            ? json({ error: "Invalid backup request" }, 400)
+            : json({ error: "Cloud backups are temporarily unavailable" }, 503);
+        }
+      }
+      if (request.method === "GET" && url.pathname === "/api/status") {
+        return json({
+          providers: [
+            { id: "gemini", status: "active", models: geminiModelOrder(env.GEMINI_MODELS ?? env.GEMINI_MODEL) },
+            { id: "cloudflare", status: "active" },
+          ],
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/api/usage") {
+        return json(await readUsageSnapshot(env.USAGE_DB, {
+          limits: parseUsageLimits(env.GEMINI_DAILY_LIMITS),
+        }));
+      }
+      if (request.method === "POST" && url.pathname === "/api/extract") return extract(request, env, context);
+      return json({ error: "Not found" }, 404);
+    },
+  } satisfies ExportedHandler<Env>;
+}
+
+export default createWorker();

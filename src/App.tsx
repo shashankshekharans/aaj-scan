@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { buildCard } from "../core/postprocess";
 import type { ContactFields, FieldName } from "../core/types";
-import { checkPasscode, extractCard, getUsage, type SharedUsage } from "./api";
-import { downloadCsv } from "./csv";
-import { db, type BatchRecord, type CardRecord, type CardState } from "./db";
+import { AdminBackupError, checkPasscode, downloadRecoveryCsv, extractCard, getBackupEvents, getUsage, type BackupEventSummary, type SharedUsage } from "./api";
+import { downloadCsv, shareCsv } from "./csv";
+import { retryBackup, saveCardLocally, startBackupSync } from "./backup-sync";
+import { backupTextIssue, CONTACT_FIELD_LIMITS, EVENT_NAME_LIMIT } from "./backup-validation";
+import { createBatchLocally, db, type BatchRecord, type CardRecord, type CardState } from "./db";
 import { prepareImage, runCombinedOcr } from "./image";
 
 const emptyFields: ContactFields = { firstName: null, lastName: null, company: null, email: null, jobTitle: null, phone: null };
@@ -120,8 +122,24 @@ export default function App() {
   const [eventName, setEventName] = useState("");
   const [selected, setSelected] = useState<CardRecord | null>(null);
   const [message, setMessage] = useState("");
+  const [sharing, setSharing] = useState(false);
   const [screen, setScreen] = useState<"scan" | "review" | "settings">("scan");
   const processing = useRef(false);
+  const backupSync = useRef<ReturnType<typeof startBackupSync> | null>(null);
+
+  async function shareApprovedCsv() {
+    if (!batch || sharing) return;
+    setSharing(true);
+    setMessage("");
+    try {
+      const result = await shareCsv(batch, cards);
+      if (result === "mail") setMessage("CSV downloaded. Attach the downloaded CSV to the email draft addressed to info@aajscm.com.");
+    } catch {
+      setMessage("Could not share the CSV. Please try again or use Download CSV.");
+    } finally {
+      setSharing(false);
+    }
+  }
 
   const refreshBatches = useCallback(async () => setBatches(await db.batches.orderBy("createdAt").reverse().toArray()), []);
   const refreshUsage = useCallback(async () => {
@@ -139,6 +157,14 @@ export default function App() {
     setCards(await db.cards.where("batchId").equals(batch.id).sortBy("createdAt"));
   }, [batch]);
 
+  const refreshCardsRef = useRef(refreshCards);
+  refreshCardsRef.current = refreshCards;
+  useEffect(() => {
+    if (!unlocked || !passcode) return;
+    const service = startBackupSync(passcode, { onChange: () => refreshCardsRef.current() });
+    backupSync.current = service;
+    return () => { service.stop(); backupSync.current = null; };
+  }, [unlocked, passcode]);
   useEffect(() => { void refreshBatches(); }, [refreshBatches]);
   useEffect(() => { void refreshCards(); }, [refreshCards]);
   useEffect(() => { if (unlocked) void refreshUsage(); }, [refreshUsage, unlocked]);
@@ -237,9 +263,8 @@ export default function App() {
   const createBatch = async (event: React.FormEvent) => {
     event.preventDefault();
     const name = eventName.trim();
-    if (!name) return;
-    const next = { id: crypto.randomUUID(), eventName: name, createdAt: Date.now() };
-    await db.batches.add(next);
+    if (!name || name.length > EVENT_NAME_LIMIT) { setMessage("Use an event name of 1 to 200 characters."); return; }
+    const next = await createBatchLocally(name);
     setEventName("");
     setBatch(next);
     setScreen("scan");
@@ -264,18 +289,24 @@ export default function App() {
 
   const approveClean = async () => {
     const clean = cards.filter((card) => card.state === "looks_good");
-    await Promise.all(clean.map((card) => db.cards.update(card.id, { state: "approved" })));
+    await Promise.all(clean.map((card) => saveCardLocally(card, true)));
     await refreshCards();
+    void backupSync.current?.run();
   };
 
   const saveSelected = async (approve = false) => {
     if (!selected) return;
-    const next = { ...selected, state: approve ? "approved" as const : selected.state };
-    await db.cards.put(next);
+    await saveCardLocally(selected, approve);
     setSelected(null);
     await refreshCards();
+    void backupSync.current?.run();
   };
 
+  const retryContactBackup = async (card: CardRecord) => {
+    await retryBackup(card.id);
+    await refreshCards();
+    void backupSync.current?.run();
+  };
   const retry = async (card: CardRecord) => {
     await db.cards.update(card.id, { state: "queued", error: undefined });
     await refreshCards();
@@ -312,7 +343,7 @@ export default function App() {
           {authError && <p className="error-text" id="auth-error" role="alert">{authError}</p>}
           <button className="button primary" type="submit" disabled={unlocking} aria-busy={unlocking}><Icon name="lock" />{unlocking ? "Unlocking…" : "Unlock scanner"}</button>
         </form>
-        <p className="privacy-note">Photos are processed temporarily and stay on this phone until you clear the batch.</p>
+        <p className="privacy-note">Photos are processed temporarily and stay on this phone until you clear the batch. Approved contact text is backed up centrally; photos are not backed up.</p>
       </section>
     </main>;
   }
@@ -320,18 +351,21 @@ export default function App() {
   if (!batch) {
     return <main className="app-shell">
       <header className="topbar"><div><img className="brand-logo" src="/AAJ_SCM_Logo.png" alt="AAJ Supply Chain Management" /><strong>Contact Scan</strong></div><span role="status" className={`network ${online ? "online" : "offline"}`}>{online ? "Online" : "Offline"}</span></header>
+      <div className="home-settings"><button className="text-button" onClick={() => setScreen(screen === "settings" ? "scan" : "settings")}><Icon name={screen === "settings" ? "back" : "settings"} />{screen === "settings" ? "Back to batches" : "Settings"}</button></div>
+      {screen === "settings" ? <SettingsPanel providers={providers} onLock={() => { sessionStorage.removeItem("contact-scan-passcode"); setUnlocked(false); setPasscode(""); setScreen("scan"); }} /> : <>
       <section className="home-hero">
         <h1>Start with the event.</h1>
         <p>Every approved contact will carry this event name into HubSpot.</p>
         <form className="event-form" onSubmit={createBatch}>
-          <label>Event name<input value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder="e.g. India Warehousing Show 2026" required /></label>
-          <button className="button primary" type="submit" disabled={!eventName.trim()}>Start batch<Icon name="chevron" /></button>
+          <label>Event name<input maxLength={EVENT_NAME_LIMIT} value={eventName} onChange={(event) => setEventName(event.target.value)} placeholder="e.g. India Warehousing Show 2026" required /></label>
+          <button className="button primary" type="submit" disabled={!eventName.trim() || eventName.trim().length > EVENT_NAME_LIMIT}>Start batch<Icon name="chevron" /></button>
         </form>
       </section>
       <CapacityCard usage={usage} onOpen={() => setUsageOpen(true)} />
       {batches.length > 0 && <section className="section"><div className="section-title"><h2>Continue a batch</h2><span>{batches.length} on this phone</span></div>
         <div className="batch-list">{batches.map((item) => <button className="batch-item" key={item.id} onClick={() => setBatch(item)}><span><strong>{item.eventName}</strong><small>{new Date(item.createdAt).toLocaleDateString()}</small></span><Icon name="chevron" /></button>)}</div>
       </section>}
+      </>}
       {usageOpen && <UsagePanel usage={usage} onClose={() => setUsageOpen(false)} />}
     </main>;
   }
@@ -353,27 +387,139 @@ export default function App() {
       </section>
       <section className="stats-grid"><div><strong>{cards.length}</strong><span>Captured</span></div><div><strong>{counts.pending}</strong><span>Processing</span></div><div><strong>{counts.review}</strong><span>Need checking</span></div></section>
       <CapacityCard usage={usage} onOpen={() => setUsageOpen(true)} compact />
-      {cards.length > 0 && <section className="section"><div className="section-title"><h2>Latest cards</h2><button className="text-button" onClick={() => setScreen("review")}>Review all<Icon name="chevron" /></button></div><CardList cards={cards.slice(-4).reverse()} onSelect={setSelected} onRetry={retry} /></section>}
+      {cards.length > 0 && <section className="section"><div className="section-title"><h2>Latest cards</h2><button className="text-button" onClick={() => setScreen("review")}>Review all<Icon name="chevron" /></button></div><CardList cards={cards.slice(-4).reverse()} onSelect={setSelected} onRetry={retry} onRetryBackup={retryContactBackup} /></section>}
     </>}
 
     {screen === "review" && <section className="section review-section">
       <div className="section-title"><div><h1>{counts.approved} approved</h1></div>{counts.clean > 0 && <button className="button compact" onClick={approveClean}>Approve {counts.clean} clean</button>}</div>
       <div className="review-summary"><span><i className="dot green" />{counts.clean} look good</span><span><i className="dot amber" />{counts.review} check</span><span><i className="dot dark" />{counts.approved} approved</span></div>
-      <CardList cards={cards} onSelect={setSelected} onRetry={retry} />
-      <div className="export-panel"><div><strong>HubSpot export</strong><span>{counts.approved} approved contacts</span></div><button className="button primary" disabled={!counts.approved} onClick={() => downloadCsv(batch, cards)}><Icon name="download" />Download CSV</button></div>
+      <CardList cards={cards} onSelect={setSelected} onRetry={retry} onRetryBackup={retryContactBackup} />
+      {backupTextIssue(undefined, batch.eventName) && <p className="flag-box" role="status">{backupTextIssue(undefined, batch.eventName)}</p>}
+      <div className="export-panel"><div><strong>HubSpot export</strong><span>{counts.approved} approved contacts</span></div><div><button className="button primary" disabled={!counts.approved} onClick={() => downloadCsv(batch, cards)}><Icon name="download" />Download CSV</button><button className="button secondary" disabled={!counts.approved || sharing} onClick={() => { void shareApprovedCsv(); }}>{sharing ? "Sharing…" : "Share CSV"}</button></div></div>
+      {message && <p className="message" role="status">{message}</p>}
       <button className="danger-button" onClick={clearBatch}>File saved? Clear this batch</button>
     </section>}
 
-    {screen === "settings" && <section className="section settings-section"><h1>Provider status</h1><p className="muted">Keys are encrypted in the Cloudflare Worker and are never sent to this phone.</p>
-      <div className="provider-list">{providers.map((provider, index) => <div key={provider.id}><span className="provider-name"><i className="status-light" aria-hidden="true" /><strong>{provider.id === "gemini" ? "Gemini" : "Cloudflare Workers AI"}</strong></span><span className="provider-role">{index === 0 ? "Primary" : "Fallback"}</span><span className="provider-status">{provider.status}</span></div>)}</div>
-      <button className="button secondary" onClick={() => { sessionStorage.removeItem("contact-scan-passcode"); setUnlocked(false); setPasscode(""); }}><Icon name="lock" />Lock app</button>
-    </section>}
+    {screen === "settings" && <SettingsPanel providers={providers} onLock={() => { sessionStorage.removeItem("contact-scan-passcode"); setUnlocked(false); setPasscode(""); setScreen("scan"); }} />}
 
     <nav className="bottom-nav" aria-label="Batch navigation"><button aria-current={screen === "scan" ? "page" : undefined} className={screen === "scan" ? "active" : ""} onClick={() => setScreen("scan")}><Icon name="scan" />Scan</button><button aria-current={screen === "review" ? "page" : undefined} className={screen === "review" ? "active" : ""} onClick={() => setScreen("review")}><Icon name="check" />Review</button><button aria-current={screen === "settings" ? "page" : undefined} className={screen === "settings" ? "active" : ""} onClick={() => setScreen("settings")}><Icon name="settings" />Settings</button></nav>
 
     {selected && <CardEditor card={selected} onChange={setSelected} onClose={() => setSelected(null)} onSave={saveSelected} />}
     {usageOpen && <UsagePanel usage={usage} onClose={() => setUsageOpen(false)} />}
   </main>;
+}
+
+
+function SettingsPanel({ providers, onLock }: { providers: { id: string; status: string }[]; onLock(): void }) {
+  return <section className="section settings-section"><h1>Settings</h1>
+    <h2>Provider status</h2><p className="muted">Keys are encrypted in the Cloudflare Worker and are never sent to this phone.</p>
+    <div className="provider-list">{providers.map((provider, index) => <div key={provider.id}><span className="provider-name"><i className="status-light" aria-hidden="true" /><strong>{provider.id === "gemini" ? "Gemini" : "Cloudflare Workers AI"}</strong></span><span className="provider-role">{index === 0 ? "Primary" : "Fallback"}</span><span className="provider-status">{provider.status}</span></div>)}</div>
+    <CloudBackups />
+    <button className="button secondary" onClick={onLock}><Icon name="lock" />Lock app</button>
+  </section>;
+}
+
+export function CloudBackups() {
+  // Intentionally memory-only. Leaving Settings or locking the app unmounts this session.
+  const [passcode, setPasscode] = useState("");
+  const [authenticated, setAuthenticated] = useState(false);
+  const [events, setEvents] = useState<BackupEventSummary[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const generation = useRef(0);
+  const activeRequest = useRef<AbortController | null>(null);
+  useLayoutEffect(() => () => {
+    generation.current++;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+  }, []);
+
+  function lock() {
+    generation.current++;
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    setPasscode(""); setAuthenticated(false); setEvents([]); setNextCursor(null);
+    setBusy(false); setDownloading(null); setMessage(""); setError("");
+  }
+
+  function fail(reason: unknown) {
+    if (reason instanceof AdminBackupError && reason.status === 401) lock();
+    setError(reason instanceof AdminBackupError ? reason.message : "Cloud backups are temporarily unavailable. Please try again.");
+  }
+
+  async function load(cursor?: string) {
+    if (busy || downloading) return;
+    const current = generation.current;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const page = await getBackupEvents(passcode, cursor, controller.signal);
+      if (generation.current !== current) return;
+      setEvents((previous) => cursor ? [...previous, ...page.events.filter((event) => !previous.some((item) => item.eventKey === event.eventKey))] : page.events);
+      setNextCursor(page.nextCursor); setAuthenticated(true);
+    } catch (reason) {
+      if (generation.current === current) fail(reason);
+    } finally {
+      if (activeRequest.current === controller) activeRequest.current = null;
+      if (generation.current === current) setBusy(false);
+    }
+  }
+
+  async function download(event: BackupEventSummary) {
+    if (busy || downloading) return;
+    const current = generation.current;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setDownloading(event.eventKey); setError(""); setMessage("");
+    try {
+      await downloadRecoveryCsv(event.eventKey, passcode, {
+        signal: controller.signal, isSessionActive: () => generation.current === current,
+      });
+      if (generation.current === current) setMessage(`Recovery CSV downloaded for ${event.eventName}. Keep this contact file secure.`);
+    } catch (reason) {
+      if (generation.current === current) fail(reason);
+    } finally {
+      if (activeRequest.current === controller) activeRequest.current = null;
+      if (generation.current === current) setDownloading(null);
+    }
+  }
+
+  return <section className="cloud-backups" aria-labelledby="cloud-backups-title">
+    <div className="section-title"><h2 id="cloud-backups-title">Cloud backups</h2>{authenticated && <button className="text-button" onClick={lock}><Icon name="lock" />Lock backups</button>}</div>
+    <p className="muted">Recover approved contact text across team phones, one CSV per event. Photos and raw OCR are never backed up.</p>
+    {!authenticated ? <form className="backup-unlock" onSubmit={(event) => { event.preventDefault(); void load(); }}>
+      <label>Administrator passcode<input type="password" autoComplete="off" value={passcode} onChange={(event) => setPasscode(event.target.value)} aria-invalid={!!error} aria-describedby="backup-session-note" required disabled={busy} /></label>
+      <button type="submit" className="button primary" disabled={busy || !passcode.trim()} aria-busy={busy}><Icon name="lock" />{busy ? "Unlocking backups..." : "Unlock backups"}</button>
+      <p id="backup-session-note" className="backup-note">Separate from the team passcode. Access lasts only while this Settings view is open. Leave Settings to lock.</p>
+    </form> : <>
+      <p className="backup-note">Administrator access is unlocked. Leave Settings to lock. Backups remain until an administrator deletes them.</p>
+      <RecoveryEventList events={events} nextCursor={nextCursor} busy={busy} downloading={downloading} onMore={() => { if (nextCursor) void load(nextCursor); }} onDownload={(event) => { void download(event); }} />
+    </>}
+    {error && <p className="error-text" role="alert">{error}</p>}
+    {message && <p className="message" role="status">{message}</p>}
+  </section>;
+}
+
+export function RecoveryEventList({ events, nextCursor, busy, downloading, onMore, onDownload }: {
+  events: BackupEventSummary[]; nextCursor: string | null; busy: boolean; downloading: string | null;
+  onMore(): void; onDownload(event: BackupEventSummary): void;
+}) {
+  return <div className="recovery-events" aria-busy={busy}>
+    {!events.length && <div className="empty-state"><strong>No cloud backups yet</strong><p>Approve a contact while online to create the first event backup. Pending contacts upload when the phone reconnects.</p></div>}
+    {events.length > 0 && <ul className="recovery-list">{events.map((event) => <li key={event.eventKey}>
+      <div className="recovery-event-summary"><h3>{event.eventName}</h3><dl>
+        <div><dt>Event date</dt><dd><time dateTime={event.eventDate}>{new Date(`${event.eventDate}T12:00:00`).toLocaleDateString()}</time></dd></div>
+        <div><dt>Approved contacts</dt><dd>{event.contactCount.toLocaleString()} {event.contactCount === 1 ? "contact" : "contacts"}</dd></div>
+        <div><dt>Latest backup</dt><dd><time dateTime={new Date(event.lastBackupAt).toISOString()}>{new Date(event.lastBackupAt).toLocaleString()}</time></dd></div>
+      </dl></div>
+      <button className="button secondary" disabled={busy || downloading !== null} aria-label={`Download recovery CSV for ${event.eventName}, ${event.eventDate}`} aria-busy={downloading === event.eventKey} onClick={() => onDownload(event)}><Icon name="download" />{downloading === event.eventKey ? "Preparing CSV..." : "Download recovery CSV"}</button>
+    </li>)}</ul>}
+    {nextCursor && <button className="button secondary" disabled={busy || downloading !== null} onClick={onMore}>{busy ? "Loading events..." : "Load more events"}</button>}
+  </div>;
 }
 
 function friendlyModel(model: string | null) {
@@ -415,30 +561,33 @@ function UsagePanel({ usage, onClose }: { usage: CapacityUsage; onClose(): void 
       <div><span>Estimated remaining</span><strong>{usage.estimatedRemaining === null ? "Set in AI Studio" : `~${usage.estimatedRemaining}`}</strong></div>
     </div>
     {usage.rateLimitedModels.length > 0 && <div className="flag-box"><strong>Rate limit detected</strong><p>{usage.rateLimitedModels.map(friendlyModel).join(", ")} reached a provider limit today. Automatic routing remains enabled.</p></div>}
-    <p className="usage-note">{usage.source === "shared" ? "This privacy-safe counter combines usage across the team. No card or contact details are stored in D1." : "Shared usage is temporarily unavailable, so this view covers this phone only."} Provider dashboards remain the authoritative source for limits.</p>
+    <p className="usage-note">{usage.source === "shared" ? "This privacy-safe counter combines usage across the team without contact details. Approved contact text is stored separately in cloud backups." : "Shared usage is temporarily unavailable, so this view covers this phone only."} Provider dashboards remain the authoritative source for limits.</p>
     <button className="button primary" onClick={onClose}>Done</button>
   </Sheet>;
 }
 
-function CardList({ cards, onSelect, onRetry }: { cards: CardRecord[]; onSelect(card: CardRecord): void; onRetry(card: CardRecord): void }) {
+export function CardList({ cards, onSelect, onRetry, onRetryBackup }: { cards: CardRecord[]; onSelect(card: CardRecord): void; onRetry(card: CardRecord): void; onRetryBackup(card: CardRecord): void }) {
   if (!cards.length) return <div className="empty-state"><Icon name="cards" /><strong>No cards yet</strong><p>Open the camera to begin.</p></div>;
   return <div className="card-list">{cards.map((card) => <article className={`contact-row state-${card.state}`} key={card.id}>
     <button className="contact-main" onClick={() => card.fields && onSelect(card)} disabled={!card.fields}>
       <Thumb image={card.image} alt="Captured business card" />
-      <span className="contact-copy"><span className="row-top"><StatePill state={card.state} />{card.provider && <small>{card.provider}</small>}</span><strong>{card.fields?.firstName || card.fields?.lastName ? `${card.fields.firstName ?? ""} ${card.fields.lastName ?? ""}`.trim() : card.state === "processing" ? "Reading card…" : "Business card"}</strong><span>{card.fields?.company ?? card.error ?? card.qualityWarning ?? "Waiting to be read"}</span></span>
+      <span className="contact-copy"><span className="row-top"><StatePill state={card.state} />{card.provider && <small>{card.provider}</small>}</span><strong>{card.fields?.firstName || card.fields?.lastName ? `${card.fields.firstName ?? ""} ${card.fields.lastName ?? ""}`.trim() : card.state === "processing" ? "Reading card…" : "Business card"}</strong><span className="contact-company">{card.fields?.company ?? card.error ?? card.qualityWarning ?? "Waiting to be read"}</span>{card.state === "approved" && card.backupState && <span role="status" className={`backup-status backup-${card.backupState}`}>{card.backupState === "synced" ? "Backed up" : card.backupState === "failed" ? "Backup failed" : "Waiting to back up"}{card.backupState === "failed" && backupTextIssue(card.fields) && <> - {backupTextIssue(card.fields)}</>}</span>}</span>
     </button>
     {card.state === "error" && <button className="retry-button" onClick={() => onRetry(card)}>Retry</button>}
+    {card.state === "approved" && card.backupState === "failed" && <button className="retry-button backup-retry" aria-label={`Retry backup for ${[card.fields?.firstName, card.fields?.lastName].filter(Boolean).join(" ") || "this contact"}`} onClick={() => onRetryBackup(card)}>Retry backup</button>}
   </article>)}</div>;
 }
 
-function CardEditor({ card, onChange, onClose, onSave }: { card: CardRecord; onChange(card: CardRecord): void; onClose(): void; onSave(approve?: boolean): void }) {
+export function CardEditor({ card, onChange, onClose, onSave }: { card: CardRecord; onChange(card: CardRecord): void; onClose(): void; onSave(approve?: boolean): void }) {
   const fields = card.fields ?? emptyFields;
+  const issue = backupTextIssue(fields);
   const update = (field: FieldName, value: string) => onChange({ ...card, fields: { ...fields, [field]: value.trim() || null } });
   return <Sheet titleId="editor-title" onClose={onClose}>
     <header><div><h2 id="editor-title">Card details</h2><p className="sheet-description">Check against the photo</p></div><button className="close-button" onClick={onClose} aria-label="Close"><Icon name="close" /></button></header>
     <div className="editor-image"><Thumb image={card.image} alt="Business card being reviewed" /></div>
-    {card.flags?.length ? <div className="flag-box"><strong>Check these items</strong>{card.flags.filter((flag) => flag.severity === "review").map((flag, index) => <p key={`${flag.code}-${index}`}>{flag.message}</p>)}</div> : <div className="good-box">All automatic checks passed.</div>}
-    <div className="field-grid">{(Object.keys(fieldLabels) as FieldName[]).map((field) => <label key={field}>{fieldLabels[field]}<input type={field === "email" ? "email" : field === "phone" ? "tel" : "text"} value={fields[field] ?? ""} onChange={(event) => update(field, event.target.value)} /></label>)}</div>
+    {card.flags?.length ? <div className="flag-box"><strong>Check these items</strong>{card.flags.filter((flag) => flag.severity === "review").map((flag, index) => <p key={`${flag.code}-${index}`}>{flag.message}</p>)}</div> : !issue && <div className="good-box">All automatic checks passed.</div>}
+    {issue && <p className="flag-box" id="backup-field-issue" role="status">{issue}</p>}
+    <div className="field-grid">{(Object.keys(fieldLabels) as FieldName[]).map((field) => <label key={field}>{fieldLabels[field]}<input type={field === "email" ? "email" : field === "phone" ? "tel" : "text"} maxLength={CONTACT_FIELD_LIMITS[field]} aria-invalid={(fields[field]?.length ?? 0) > CONTACT_FIELD_LIMITS[field] || undefined} aria-describedby={issue ? "backup-field-issue" : undefined} value={fields[field] ?? ""} onChange={(event) => update(field, event.target.value)} /></label>)}</div>
     <div className="editor-actions"><button className="button secondary" onClick={() => onSave(false)}>Save</button><button className="button primary" onClick={() => onSave(true)}>Approve contact</button></div>
   </Sheet>;
 }

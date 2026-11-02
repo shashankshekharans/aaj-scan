@@ -18,8 +18,14 @@
       "database_name": "aaj-contact-scan-usage",
       "database_id": "a9f1e035-e9ee-4a82-b02b-9748af07b63e",
       "migrations_dir": "migrations"
+    },
+    {
+      "binding": "BACKUP_DB",
+      "database_name": "aaj-contact-scan-backup",
+      "database_id": "ba7111b4-35d4-47ab-969b-60b6126caad7",
+      "migrations_dir": "migrations/backup"
     }
   ],
-  "secrets": { "required": ["TEAM_PASSCODE", "GEMINI_API_KEY"] },
+  "secrets": { "required": ["TEAM_PASSCODE", "GEMINI_API_KEY", "BACKUP_ADMIN_PASSCODE"] },
   "observability": { "enabled": true, "head_sampling_rate": 0.1 }
 }

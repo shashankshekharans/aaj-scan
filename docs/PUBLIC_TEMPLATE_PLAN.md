@@ -2,7 +2,7 @@
 
 Status: **AAJ application deployed with shared D1 usage; pilot and public template remain**
 Recorded: **2026-10-31**
-Last updated: **2026-11-01**
+Last updated: **2026-11-02**
 
 This document preserves the agreed plan for finishing the private AAJ Contact Scan application and producing a separate, reusable public Contact Scan template. It is the project checklist and should be updated as work is completed.
 
@@ -16,7 +16,7 @@ Completed on 2026-11-01:
 
 - Created `aaj-contact-scan-usage` and applied the privacy-safe schema.
 - Bound D1 to the Worker and added authenticated shared usage reporting.
-- Kept card images and extracted contact information out of D1.
+- Kept card images and extracted contact information out of the usage D1 database.
 - Added a resilient on-device usage fallback.
 - Integrated the premium light-mode UI and transparent AAJ brand logo.
 - Deployed and verified the live Worker, then synced GitHub `main`.
@@ -32,6 +32,21 @@ Completed on 2026-11-01:
 - [ ] Resolve issues discovered during the pilot.
 - [ ] Tag the approved stable version as `v1.0.0`.
 - [ ] Make the `aaj-scan` repository private.
+
+### CSV sharing and approved-text backup
+
+- [x] Keep local CSV download and add native file sharing with desktop download/email fallback.
+- [x] Queue newly approved contact text for resilient, idempotent background backup.
+- [x] Store backup contacts in separate `aaj-contact-scan-backup` D1; keep photos/raw OCR out.
+- [x] Add a separate administrator passcode, metadata-only event pagination and authenticated recovery CSV download in Settings.
+- [x] Create the backup database and add `BACKUP_DB` configuration while preserving `USAGE_DB`.
+- [x] Document consent, indefinite-until-admin-deletion retention, scoped Cloudflare deletion and secret rotation in README.
+- [ ] Have the administrator securely set `BACKUP_ADMIN_PASSCODE` (never commit it).
+- [ ] Apply `migrations/backup/0001_backup_contacts.sql` to `BACKUP_DB` remotely, then deploy.
+- [ ] Verify synthetic approval, idempotent retry, correction update, two-batch event aggregation and administrator recovery in production.
+- [ ] Verify native CSV sharing on Android and desktop download/mail fallback.
+- [ ] Complete privacy/security review and push only after live verification.
+- [ ] For the generic template, provision each organization's own backup D1 and administrator secret; never reuse AAJ database IDs or credentials.
 
 ### Shared AI Capacity
 
@@ -150,7 +165,7 @@ Before announcing the public template:
 - [ ] Follow only the published instructions—do not rely on project knowledge.
 - [ ] Confirm no AAJ-specific content appears in the generic deployment.
 - [ ] Confirm secrets never enter GitHub or browser-delivered JavaScript.
-- [ ] Confirm card images and contacts stay in the user's browser except during authorized AI processing.
+- [ ] Confirm card images stay in the user's browser except during authorized AI processing, and disclose the separate approved-text cloud backup, administrator recovery and retention policy.
 - [ ] Test Android installation, capture, review, editing and CSV export.
 - [ ] Test Gemini quota failover and Workers AI fallback.
 - [ ] Confirm the public deployment can be updated from its own repository.
