@@ -1,5 +1,6 @@
 {
   "name": "contact-scan",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +10,8 @@
     "deploy": "npm run build && wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "demo:assets": "node scripts/prepare-demo-assets.mjs",
+    "demo:verify": "node scripts/verify-demo-assets.mjs",
     "eval": "tsx eval/run.ts"
   },
   "dependencies": {
