@@ -70,7 +70,7 @@ function flagCompanyFromEmail(company: string | null, email: string | null, e: E
     code: "company_from_email",
     field: "company",
     severity: "review",
-    message: `Company matches the email domain (${domainOf(email!)}) — confirm the name`,
+    message: `Company matches the email domain (${domainOf(email!)}) - confirm the name`,
   });
 }
 
@@ -125,7 +125,7 @@ function pickEmail(e: Extraction, company: string | null, site: string | null, f
     const pool = matching.length ? matching : emails;
     const nameParts = [e.first_name, e.last_name].map((n) => alnum(n ?? "")).filter((n) => n.length >= 3);
     chosen = pool.find((m) => nameParts.some((n) => m.split("@")[0]!.includes(n))) ?? pool[0]!;
-    flags.push({ code: "multiple_emails", field: "email", severity: "review", message: `${emails.length} emails on card — confirm the right one` });
+    flags.push({ code: "multiple_emails", field: "email", severity: "review", message: `${emails.length} emails on card - confirm the right one` });
   }
 
   if (!EMAIL_RE.test(chosen)) {
@@ -139,13 +139,13 @@ function pickEmail(e: Extraction, company: string | null, site: string | null, f
   } else if (site && sameSite(domain, site)) {
     // Consistent with the card.
   } else if (site && oneEditApart(domain, site)) {
-    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: `Email domain is one character different from the website (${site}) — check for a typo` });
+    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: `Email domain is one character different from the website (${site}) - check for a typo` });
   } else if (domainMatchesCompany(domain, company)) {
     // A distinct company-related domain may legitimately differ from the website.
   } else if (site) {
     flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: `Email domain differs from website (${site}) and company name` });
   } else if (company) {
-    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: "Email domain does not resemble the company name — check the address" });
+    flags.push({ code: "email_domain_mismatch", field: "email", severity: "review", message: "Email domain does not resemble the company name - check the address" });
   }
   return chosen;
 }
@@ -173,11 +173,11 @@ function pickPhone(e: Extraction, flags: Flag[]): string | null {
   const mobiles = phones.filter(isMobile);
   const pool = mobiles.length ? mobiles : phones;
   if (pool.length > 1) {
-    flags.push({ code: "multiple_phones", field: "phone", severity: "review", message: `${pool.length} candidate numbers — confirm which to keep` });
+    flags.push({ code: "multiple_phones", field: "phone", severity: "review", message: `${pool.length} candidate numbers - confirm which to keep` });
   }
   const chosen = pool[0]!.number;
   if (!parsePhoneNumberFromString(chosen, "IN")?.isValid()) {
-    flags.push({ code: "phone_unverified", field: "phone", severity: "review", message: "Phone number did not validate — check digits" });
+    flags.push({ code: "phone_unverified", field: "phone", severity: "review", message: "Phone number did not validate - check digits" });
   }
   return chosen;
 }
@@ -197,13 +197,13 @@ function pickName(e: Extraction, flags: Flag[]) {
 
   const initial = /^[A-Za-z]\.?$/;
   if (first?.split(" ").some((t) => initial.test(t))) {
-    flags.push({ code: "name_initials", field: "firstName", severity: "review", message: "First name is initials — check the split" });
+    flags.push({ code: "name_initials", field: "firstName", severity: "review", message: "First name is initials - check the split" });
   } else if (last?.split(" ").some((t) => initial.test(t))) {
-    flags.push({ code: "name_initials", field: "lastName", severity: "review", message: "Last name contains initials — check the split" });
+    flags.push({ code: "name_initials", field: "lastName", severity: "review", message: "Last name contains initials - check the split" });
   }
   const tokens = (full ?? `${first ?? ""} ${last ?? ""}`).trim().split(" ").filter(Boolean);
   if (tokens.length > 3 && !flags.some((f) => f.code === "name_split_uncertain")) {
-    flags.push({ code: "name_split_uncertain", field: "lastName", severity: "review", message: "Long name — check first/last split" });
+    flags.push({ code: "name_split_uncertain", field: "lastName", severity: "review", message: "Long name - check first/last split" });
   }
   return { first, last };
 }
@@ -231,7 +231,7 @@ export function buildCard(e: Extraction, ocrText: string | null): CardResult {
       code: "job_title_without_name",
       field: "jobTitle",
       severity: "review",
-      message: "Job title found without a named person — confirm whether it is a role label",
+      message: "Job title found without a named person - confirm whether it is a role label",
     });
   }
 
@@ -240,7 +240,7 @@ export function buildCard(e: Extraction, ocrText: string | null): CardResult {
       code: "title_may_be_truncated",
       field: "jobTitle",
       severity: "review",
-      message: "The card text appears to continue after the extracted job title — check the full title",
+      message: "The card text appears to continue after the extracted job title - check the full title",
     });
   }
 
@@ -253,7 +253,7 @@ export function buildCard(e: Extraction, ocrText: string | null): CardResult {
     for (const f of ALL_FIELDS) {
       const v = fields[f];
       if (v && !isOnCard(v, ocrText, f === "phone" ? "phone" : "text")) {
-        flags.push({ code: "not_on_card", field: f as FieldName, severity: "review", message: "Not found in the card text — verify" });
+        flags.push({ code: "not_on_card", field: f as FieldName, severity: "review", message: "Not found in the card text - verify" });
       }
     }
   }

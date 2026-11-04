@@ -28,6 +28,8 @@ interface Env {
   USAGE_DB: UsageDatabase;
   BACKUP_DB: BackupDatabase;
   BACKUP_ADMIN_PASSCODE: string;
+  AUTH_RATE_LIMITER?: RateLimit;
+  ADMIN_RATE_LIMITER?: RateLimit;
 }
 
 interface ExtractRequest {
@@ -43,6 +45,22 @@ const JSON_HEADERS = {
 
 const json = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { status, headers: JSON_HEADERS });
+
+const rateLimited = () => new Response(
+  JSON.stringify({ error: "Too many attempts. Please wait and try again." }),
+  { status: 429, headers: { ...JSON_HEADERS, "retry-after": "60" } },
+);
+
+async function blockedByRateLimit(request: Request, limiter?: RateLimit): Promise<boolean> {
+  if (!limiter) return false;
+  try {
+    const key = (request.headers.get("cf-connecting-ip") ?? "unknown").slice(0, 64);
+    return !(await limiter.limit({ key })).success;
+  } catch {
+    // Authentication remains the authority if the optional edge binding is unavailable.
+    return false;
+  }
+}
 
 async function sameSecret(a: string, b: string): Promise<boolean> {
   const encode = (value: string) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
@@ -352,12 +370,16 @@ export function createWorker(options: { now?: () => number; adminAuthLimiter?: A
       if (url.pathname.startsWith("/api/admin/")) {
         const supplied = request.headers.get("x-admin-passcode") ?? "";
         if (!supplied || !env.BACKUP_ADMIN_PASSCODE || !(await sameSecret(supplied, env.BACKUP_ADMIN_PASSCODE))) {
+          if (await blockedByRateLimit(request, env.ADMIN_RATE_LIMITER)) return rateLimited();
           await adminAuthLimiter.failed(request);
           return json({ error: "Incorrect administrator passcode" }, 401);
         }
         return adminBackup(request, env, url);
       }
-      if (!(await authorized(request, env))) return json({ error: "Incorrect team passcode" }, 401);
+      if (!(await authorized(request, env))) {
+        if (await blockedByRateLimit(request, env.AUTH_RATE_LIMITER)) return rateLimited();
+        return json({ error: "Incorrect team passcode" }, 401);
+      }
       if (request.method === "POST" && url.pathname === "/api/backup/contacts") {
         try {
           return json(await upsertBackupContact(env.BACKUP_DB, await backupRequestBody(request), now()));

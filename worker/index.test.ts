@@ -47,6 +47,64 @@ describe("GET /api/usage", () => {
   });
 });
 
+describe("authentication rate limiting", () => {
+  const blockingLimiter = (keys: string[]) => ({
+    async limit({ key }: { key: string }) {
+      keys.push(key);
+      return { success: false };
+    },
+  });
+
+  it("returns a neutral 429 for a blocked team authentication attempt and uses the fallback key", async () => {
+    const fixture = environment();
+    const keys: string[] = [];
+    const response = await createWorker().fetch(new Request("https://example.test/api/status", {
+      headers: { "x-team-passcode": "wrong" },
+    }), { ...fixture.env, AUTH_RATE_LIMITER: blockingLimiter(keys) } as never);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toEqual({ error: "Too many attempts. Please wait and try again." });
+    expect(keys).toEqual(["unknown"]);
+  });
+
+  it("returns the same neutral 429 for a blocked administrator attempt keyed by connecting IP", async () => {
+    const fixture = backupEnvironment();
+    const keys: string[] = [];
+    const response = await createWorker({ adminAuthLimiter: { async failed() {} } }).fetch(
+      backupRequest("/api/admin/backups", { "x-admin-passcode": "wrong", "cf-connecting-ip": "192.0.2.10" }),
+      { ...fixture.env, ADMIN_RATE_LIMITER: blockingLimiter(keys) } as never,
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(await response.json()).toEqual({ error: "Too many attempts. Please wait and try again." });
+    expect(keys).toEqual(["192.0.2.10"]);
+    expect(fixture.reads()).toBe(0);
+  });
+
+  it("does not consume rate-limit capacity for valid credentials", async () => {
+    const fixture = environment();
+    const keys: string[] = [];
+    const response = await createWorker().fetch(new Request("https://example.test/api/status", {
+      headers: { "x-team-passcode": "correct-passcode", "cf-connecting-ip": "192.0.2.11" },
+    }), { ...fixture.env, AUTH_RATE_LIMITER: blockingLimiter(keys) } as never);
+
+    expect(response.status).toBe(200);
+    expect(keys).toEqual([]);
+  });
+
+  it("fails open when the Cloudflare rate-limit binding is unavailable", async () => {
+    const fixture = environment();
+    const response = await createWorker().fetch(new Request("https://example.test/api/status", {
+      headers: { "x-team-passcode": "wrong" },
+    }), { ...fixture.env, AUTH_RATE_LIMITER: { async limit() { throw new Error("binding unavailable"); } } } as never);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Incorrect team passcode" });
+  });
+});
+
 // Backup endpoint tests use an external D1 boundary double; SQL/migration behavior is
 // exercised against real SQLite in backup.test.ts.
 
