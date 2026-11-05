@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "demo:assets": "node scripts/prepare-demo-assets.mjs",
     "demo:verify": "node scripts/verify-demo-assets.mjs",
-    "eval": "tsx eval/run.ts"
+    "eval": "tsx eval/run.ts",
+    "brand:assets": "node scripts/prepare-brand-assets.mjs"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",

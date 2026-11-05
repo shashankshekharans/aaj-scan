@@ -1,32 +1,27 @@
-# Extraction evaluation
+# Extraction Evaluation
 
-Measures each extraction method on your real cards before we pick the provider order (PRD §5).
+Before trusting any AI provider with real contacts, measure it on real cards. This harness runs each configured provider against a verified test set and reports the metric that matters most: **silent errors**, wrong values that were not flagged for review. The current provider order and its evidence are recorded in [Evaluation results](../docs/EVALUATION_RESULTS.md).
 
-## What you need to do
+## Prepare a test set
 
-1. **Create the free accounts** (no credit card, one account per provider):
-   - Google AI Studio → https://aistudio.google.com/apikey → *Create API key*
-   - Groq → https://console.groq.com/keys → *Create API Key*
-   - Cloudflare → https://dash.cloudflare.com/sign-up → copy the **Account ID**, then *My Profile → API Tokens → Create Token →* "Workers AI" template
-   - Mistral → https://console.mistral.ai → choose the free plan → *API Keys*
-2. **Add the keys:** copy `.env.example` to `.env` in the project folder and paste each key after its `=`. Don't paste keys into chat. Missing keys are fine; that provider is skipped.
-3. **Check the free limits** in each dashboard (AI Studio → *Rate limits*; Groq → *Settings → Limits*) and note the requests-per-day numbers. The providers don't publish them.
-4. **Add 20–30 card photos** to `eval/cards/` (JPG/PNG). Name them `card-01.jpg`, `card-02.jpg`, …, keep the physical cards in the same order, and include the hard ones: dark backgrounds, vertical layouts, tiny fonts, two phone numbers, initials in names, one or two without email.
+1. **Collect 20–30 card photos** in `eval/cards/` as `card-01.jpg`, `card-02.jpg`, … Include the difficult ones: dark backgrounds, vertical layouts, tiny fonts, two phone numbers, initials in names, and one or two cards without an email.
+2. **Write the ground truth** in `eval/ground-truth.json` (format below). One person transcribes; a second person checks every entry against the physical card.
+3. **Add provider keys** by copying `.env.example` to `.env`. Providers without a key are skipped.
 
-A maintainer then drafts `eval/ground-truth.json` from the photos and **a second person checks every entry against the physical card**.
+Card photos, ground truth and results are personal data. They are git-ignored and must never be committed.
 
-## Running
+## Run
 
 ```bash
-npm run eval -- --limit 3          # cheap smoke test on 3 cards
-npm run eval                       # all cards, all configured providers + OCR-only
-npm run eval -- --methods gemini   # one provider
-npm run eval -- --no-grounding     # turn off the OCR cross-check, to measure what it adds
-npm run eval -- --crop-grounding   # crop the card region before local OCR
-npm run eval -- --combined-grounding # combine full-frame and cropped OCR
+npm run eval -- --limit 3              # smoke test on three cards
+npm run eval                           # every card, every configured provider, plus OCR-only
+npm run eval -- --methods gemini       # a single provider
+npm run eval -- --no-grounding         # disable the OCR cross-check to measure its effect
+npm run eval -- --crop-grounding       # crop the card region before local OCR
+npm run eval -- --combined-grounding   # combine full-frame and cropped OCR (production setting)
 ```
 
-Reports go to `eval/results/report-<time>.md`. Model answers are cached, so re-running costs no quota (`--fresh` forces new calls).
+Reports are written to `eval/results/report-<time>.md`. Provider answers are cached, so re-scoring costs no quota; `--fresh` forces new calls.
 
 ## Ground truth format
 
@@ -41,4 +36,4 @@ Reports go to `eval/results/report-<time>.md`. Model answers are cached, so re-r
 ]
 ```
 
-Write values exactly as printed; use `null` for anything not on the card. `phone` is the mobile number if one is printed, otherwise the only/first number. `skip` is `no_email`, `non_english` or `not_a_card`.
+Write values exactly as printed and use `null` for anything not on the card. `phone` is the mobile number when one is printed, otherwise the first number. `skip` is `no_email`, `non_english` or `not_a_card`.

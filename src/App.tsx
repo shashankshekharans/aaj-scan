@@ -7,6 +7,7 @@ import { retryBackup, saveCardLocally, startBackupSync } from "./backup-sync";
 import { backupTextIssue, CONTACT_FIELD_LIMITS, EVENT_NAME_LIMIT } from "./backup-validation";
 import { createBatchLocally, db, type BatchRecord, type CardRecord, type CardState } from "./db";
 import { prepareImage, runCombinedOcr } from "./image";
+import { requestWakeLock, type WakeLockHandle } from "./wake-lock";
 
 const emptyFields: ContactFields = { firstName: null, lastName: null, company: null, email: null, jobTitle: null, phone: null };
 const fieldLabels: Record<FieldName, string> = {
@@ -89,7 +90,12 @@ function Icon({ name }: { name: IconName }) {
 }
 
 function BrandLogo({ className = "" }: { className?: string }) {
-  return <img className={className} src="/AAJ_SCM_Logo.webp" width="360" height="115" alt="AAJ Supply Chain Management" fetchPriority="high" />;
+  return <img className={className} src="/aaj-logo-264.webp" srcSet="/aaj-logo-264.webp 2x, /aaj-logo-396.webp 3x" width="132" height="37" alt="AAJ Supply Chain Management" fetchPriority="high" />;
+}
+
+/** Product wordmark shown in the app header once signed in. */
+function ScanLogo() {
+  return <img className="scan-logo" src="/aaj-scan-logo-60.webp" srcSet="/aaj-scan-logo-60.webp 2x, /aaj-scan-logo-90.webp 3x" width="196" height="30" alt="AAJ Contact Scan" fetchPriority="high" />;
 }
 
 export function SocialFooter() {
@@ -232,9 +238,9 @@ export default function App() {
   const processQueue = useCallback(async () => {
     if (!batch || processing.current || !navigator.onLine) return;
     processing.current = true;
-    let wakeLock: { release(): Promise<void> } | undefined;
+    let wakeLock: WakeLockHandle | undefined;
     try {
-      wakeLock = await (navigator as Navigator & { wakeLock?: { request(): Promise<{ release(): Promise<void> }> } }).wakeLock?.request();
+      wakeLock = await requestWakeLock();
       while (navigator.onLine) {
         const card = await db.cards.where("batchId").equals(batch.id).filter((item) => item.state === "queued" || item.state === "error").first();
         if (!card) break;
@@ -265,7 +271,7 @@ export default function App() {
         await refreshUsage();
       }
     } finally {
-      await wakeLock?.release();
+      await wakeLock?.release().catch(() => undefined);
       processing.current = false;
       await refreshCards();
     }
@@ -371,7 +377,7 @@ export default function App() {
     return <main className="app-shell">
       {screen === "settings"
         ? <header className="topbar"><button className="back-button" aria-label="Back to Batches" onClick={() => setScreen("scan")}><Icon name="back" /></button><div className="batch-heading"><h1 className="topbar-title">Settings</h1></div><span role="status" className={`network ${online ? "online" : "offline"}`}>{online ? "Online" : "Offline"}</span></header>
-        : <header className="topbar"><div><BrandLogo className="brand-logo" /><strong>Contact Scan</strong></div><span role="status" className={`network ${online ? "online" : "offline"}`}>{online ? "Online" : "Offline"}</span></header>}
+        : <header className="topbar"><div><ScanLogo /></div><span role="status" className={`network ${online ? "online" : "offline"}`}>{online ? "Online" : "Offline"}</span></header>}
       {screen === "settings" ?
         <SettingsPanel providers={providers} showTitle={false} onLock={() => { sessionStorage.removeItem("contact-scan-passcode"); setUnlocked(false); setPasscode(""); setScreen("scan"); }} /> : <>
       <section className="home-hero">

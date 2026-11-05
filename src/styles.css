@@ -66,8 +66,7 @@ input[aria-invalid="true"] { border-color: var(--red); }
 .app-shell.with-nav { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 .topbar { min-height: 76px; padding: 14px var(--page-inset); display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: 0; z-index: 10; background: var(--white); border-bottom: 1px solid var(--line); }
 .topbar > div:first-child { display: flex; align-items: center; gap: 14px; }
-.topbar > div > strong { font-size: .9375rem; }
-.brand-logo { display: block; width: 70px; height: 28px; object-fit: contain; object-position: left center; padding-inline-end: 14px; border-inline-end: 1px solid var(--line); }
+.scan-logo { display: block; width: auto; height: 30px; }
 .network { display: flex; align-items: center; gap: 7px; font-size: .75rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
 .network::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
 .network.offline::before { background: var(--red); }

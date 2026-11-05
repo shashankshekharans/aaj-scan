@@ -1,4 +1,4 @@
-# Product
+# Product Brief — AAJ Contact Scan
 
 ## Platform
 
@@ -37,9 +37,9 @@ The AAJ reference deployment uses the supplied AAJ logo, the red/ivory/charcoal 
 
 ## Evidence on Hand
 
-- Real deployed product and user-confirmed real-device V1 test.
-- Twelve user-confirmed synthetic business cards under `demo/synthetic-cards/`.
-- Privacy-safe application screenshots under `site/assets/`.
+- Live production deployment, tested end to end on real Android devices.
+- Twelve synthetic business cards, confirmed fictional, under `demo/synthetic-cards/`.
+- Privacy-safe application screenshots under `docs/assets/`.
 - Provider evaluation in `docs/EVALUATION_RESULTS.md`.
 - No testimonials, adoption metrics, pricing claims or public customer logos beyond AAJ; future surfaces must not fabricate them.
 

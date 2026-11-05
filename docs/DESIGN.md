@@ -22,6 +22,3 @@ Use obvious reading order, generous separation between sections and compact spac
 
 Controls name concrete actions. Green, yellow and red status colors always accompany text. Motion is purposeful, brief and disabled by `prefers-reduced-motion`. Touch targets are at least 44px.
 
-## Public Showcase Extension
-
-The product page may expand the established palette with warm ivory grounds and large editorial typography while preserving the same red, charcoal, green and type pairing. Its signature interaction is a synthetic card moving through capture, extraction, review and export states without calling production APIs.

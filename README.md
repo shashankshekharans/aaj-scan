@@ -1,53 +1,78 @@
 <div align="center">
-  <img src="docs/assets/readme-hero.svg" alt="AAJ Contact Scan - business cards to reviewed CRM-ready contacts" width="100%" />
+  <img src="public/aaj-scan-logo-90.webp" alt="AAJ Scan" width="392" />
 
-  <p><strong>A privacy-aware, installable business-card scanner built for event teams.</strong></p>
-  <p>Capture cards → extract with AI → review every field → share CSV → recover approved text.</p>
+  <h3>Every card from the event, in your CRM by Monday — checked, not guessed.</h3>
+
+  <p>
+    <a href="https://github.com/shashankshekharans/aaj-scan/actions/workflows/ci.yml"><img src="https://github.com/shashankshekharans/aaj-scan/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
+    <a href="https://github.com/shashankshekharans/aaj-scan/releases"><img src="https://img.shields.io/github/v/release/shashankshekharans/aaj-scan?color=c22028" alt="Latest release" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-2c2c2c" alt="MIT licence" /></a>
+  </p>
 
   <p>
     <a href="https://aaj.contact-scan.workers.dev/"><strong>Open the live app</strong></a>
-    · <a href="#see-the-real-workflow">Watch the real workflow</a>
-    · <a href="docs/DEPLOYMENT.md">Deploy your own</a>
+    · <a href="#see-it-work">See it work</a>
+    · <a href="docs/FORKING.md">Use it for your team</a>
+    · <a href="#about-aaj-scm">Built by AAJ SCM</a>
   </p>
 </div>
 
 ---
 
-## From a stack of cards to a checked contact list
+## The Monday after the expo
 
-AAJ Contact Scan turns event business cards into a HubSpot-ready CSV without hiding uncertainty. It prepares images on-device, routes extraction through an adaptive Gemini model pool, falls back to Cloudflare Workers AI, and asks a human to approve every contact before export or backup.
+The stall is packed away. What's left is a rubber-banded stack of business cards: two hundred conversations, each one a possible customer.
 
-| Capture | Review | Deliver |
-|---|---|---|
-| Camera or gallery, offline queue, local image preparation | Confidence states, editable fields, OCR grounding | Download/share CSV, text-only D1 backup, administrator recovery |
+Then someone types them up. Name, title, company, email, phone, one card at a time, a couple of minutes each. By card eighty, a `0` becomes an `O`, an email loses a letter, and a hot lead quietly bounces. The follow-up goes out days late, if it goes out at all.
 
-## See the real workflow
+AAJ's marketing team lived this after every trade show. So we built the tool we wanted.
+
+## What AAJ Contact Scan does
+
+**Point a phone at a card. Check what it read. Send the list to HubSpot.**
+
+1. **Capture** the whole stack on an Android phone, one card at a time or as a fast batch, even with patchy venue Wi-Fi.
+2. **Extract** each card with AI that reads layout, not just letters, and cross-checks every value against the text actually printed on the card.
+3. **Review** a clean table. Cards the system is sure about are marked *looks good*; anything uncertain is flagged in plain language, never silently filled in.
+4. **Deliver** a HubSpot-ready CSV in one tap, with every contact tagged to the event it came from.
+
+## Built on one principle: never guess
+
+AI that sounds confident is easy. AI that admits doubt is useful. Before choosing a model, we tested every candidate on 20 real, hard business cards: dark backgrounds, vertical layouts, stylised fonts, cards listing three people. The measure was **silent errors**, wrong answers that would slip into the CRM unflagged.
+
+| Engine | Silent errors on 20 real cards | Role |
+|---|---:|---|
+| Google Gemini | **0** | Primary |
+| Cloudflare Workers AI | **0** | Automatic fallback |
+| Groq | 7 | Rejected for automatic approval |
+| On-device OCR alone | 38 | Used only to cross-check the AI |
+
+The method and full results are in [Evaluation results](docs/EVALUATION_RESULTS.md).
+
+## See it work
+
+### On the phone — capture, review, approve
 
 <p align="center">
-  <img src="docs/assets/contact-scan-demo.gif" alt="Real AAJ Contact Scan workflow using a synthetic business card: create an event, capture, extract, review, approve, back up and prepare CSV export" width="430" />
+  <img src="docs/assets/contact-scan-demo.gif" alt="AAJ Contact Scan on a phone: create an event, capture a synthetic card, review the extracted fields, approve and export" width="430" />
 </p>
 
-<p align="center"><sub>Actual production interface · synthetic demonstration card · no real contact data</sub></p>
-
-## What makes it useful
-
-- **Human approval by design.** AI output never silently becomes a marketing contact.
-- **Adaptive extraction.** Quota, rate-limit and temporary model failures rotate through configured Gemini models before Workers AI fallback.
-- **Offline-friendly field work.** Batches and card photos remain on the phone until cleared.
-- **Shared capacity visibility.** Privacy-safe usage events show team activity without storing card or contact data.
-- **Recoverable approved text.** D1 stores approved contact fields only; photographs and raw OCR are never backed up.
-- **Installable PWA.** The light-mode interface is designed for Android event teams and works from a normal URL.
-
-## Try it safely
-
-The repository includes twelve synthetic business cards with fictional/demo details. They can be used in screenshots, workshops and test deployments without publishing real event contacts.
+### On the desktop — the same flow, larger
 
 <p align="center">
-  <img src="demo/synthetic-cards/synthetic-card-01.webp" alt="Synthetic AAJ business card used for public demonstrations" width="46%" />
-  <img src="demo/synthetic-cards/synthetic-card-05.webp" alt="Second synthetic business card used for public demonstrations" width="27%" />
+  <img src="docs/assets/contact-scan-desktop-demo.gif" alt="AAJ Contact Scan on a desktop browser: start an event, choose a synthetic card, extract, verify, approve, back up and export CSV" width="960" />
 </p>
 
-Browse the complete [`demo/synthetic-cards`](demo/synthetic-cards) set. These files are optimized WebP images with metadata removed.
+<p align="center"><sub>Recorded on the live production app with synthetic demonstration cards. No real contact data is shown.</sub></p>
+
+## Why teams trust it
+
+- **A person approves every contact.** AI output never becomes a CRM record on its own.
+- **Doubt is visible.** Missing fields, guessed companies, look-alike email domains and truncated titles are flagged where you'll see them.
+- **Photos stay on the phone.** Card images are processed in the moment and stay in the browser until you clear the batch. They are never backed up.
+- **Approved text is recoverable.** If an export is missed, an administrator can recover the event's approved contacts as a CSV.
+- **It keeps working when quotas don't.** When one AI model hits its limit, the next takes over automatically.
+- **Free to run at event scale.** Built on free tiers of Cloudflare and Google AI, with no per-card fees.
 
 ## How it works
 
@@ -65,11 +90,17 @@ flowchart LR
   C --> J[(Privacy-safe usage D1)]
 ```
 
-Card photos stay in browser storage until the batch is cleared. During an authorized scan, the prepared image is sent temporarily to the configured AI provider. Only approved text is eligible for backup. See [Security](docs/SECURITY.md) for the complete trust boundary.
+The phone prepares each image and reads it locally first. A Cloudflare Worker authenticates the team, sends the prepared image to the AI provider and validates the answer against the local reading. Nothing reaches the CRM until a person approves it. The full trust boundary is described in [Security](docs/SECURITY.md).
 
-## Run locally
+## Use it for your own team
 
-Requires Node.js 24+.
+The code is MIT-licensed and designed to be forked. Every deployment gets its own Worker, databases and secrets, so your contacts never touch ours. Start with [Using AAJ Contact Scan for your organisation](docs/FORKING.md), then follow [Deployment](docs/DEPLOYMENT.md).
+
+Twelve fictional business cards in [`demo/synthetic-cards`](demo/synthetic-cards) let you try the whole flow, record demos or run workshops without exposing anyone's details.
+
+### Run locally
+
+Requires Node.js 24 or later.
 
 ```bash
 git clone https://github.com/shashankshekharans/aaj-scan.git
@@ -79,46 +110,52 @@ npm test
 npm run dev
 ```
 
-For a real deployment, do not reuse AAJ's Worker, D1 IDs, secrets or API quota. Follow [Deploy your own copy](docs/DEPLOYMENT.md) to create isolated resources.
-
 ## Project map
 
 | Path | Responsibility |
 |---|---|
-| `src/` | React PWA, capture/review workflow, local storage, sharing and recovery UI |
+| `src/` | React PWA: capture, review, local storage, sharing and recovery |
 | `worker/` | Authentication, Gemini routing, Workers AI fallback, usage and backup APIs |
-| `core/` | Provider-neutral schema, extraction, grounding and scoring |
-| `migrations/` | Independent D1 schemas for usage metadata and approved-contact backup |
-| `eval/` | Provider evaluation harness; real cards and ground truth remain git-ignored |
-| `demo/` | Public-safe synthetic card set |
+| `core/` | Provider-neutral schema, extraction rules, OCR grounding and scoring |
+| `migrations/` | D1 schemas for usage metadata and approved-contact backup |
+| `eval/` | Provider evaluation harness (real cards and ground truth stay private) |
+| `brand/` | Source logos; `npm run brand:assets` regenerates optimised app assets |
+| `demo/` | Public-safe synthetic business cards |
 
 ## Documentation
 
-- [Deployment](docs/DEPLOYMENT.md) - create your own Worker, D1 databases and secrets.
-- [Operations](docs/OPERATIONS.md) - rotate credentials, recover CSVs, manage retention and respond to provider limits.
-- [Security](docs/SECURITY.md) - public-repository boundary, data flow and vulnerability reporting.
-- [Product requirements](docs/PRD.md) - original problem, scope and acceptance criteria.
-- [Evaluation results](docs/EVALUATION_RESULTS.md) - provider comparison and accuracy safeguards.
-- [Public repository model](docs/PUBLIC_TEMPLATE_PLAN.md) - how the AAJ showcase and reusable source coexist.
+- [Using it for your organisation](docs/FORKING.md): what to replace and the isolation rule
+- [Deployment](docs/DEPLOYMENT.md): create your own Worker, D1 databases and secrets
+- [Operations](docs/OPERATIONS.md): rotate credentials, recover CSVs, manage retention
+- [Security](docs/SECURITY.md): data flow, trust boundary and vulnerability reporting
+- [Evaluation results](docs/EVALUATION_RESULTS.md): how the AI providers were chosen
+- [Product requirements](docs/PRD.md): the original problem, scope and acceptance criteria
+- [Changelog](CHANGELOG.md)
+
+## About AAJ SCM
+
+AAJ Contact Scan is built and run by **[AAJ Supply Chain Management](https://www.aajscm.com/)**, a full-stack supply chain partner for brands growing across India. Our marketing team meets prospects at trade shows and expos across the country. This tool is how those conversations reach our CRM while they're still warm.
+
+We're sharing it because every team that collects business cards deserves better than retyping them.
 
 <details>
-<summary><strong>Does a public repository expose the API keys or passcodes?</strong></summary>
+<summary><strong>Does this public repository expose API keys or passcodes?</strong></summary>
 
-No. Production secrets are stored as encrypted Cloudflare Worker secrets and are absent from Git. `.env` and `.dev.vars` are ignored. Public source code does expose the application's design, so strong unique credentials, edge rate limiting and regular rotation remain required.
+No. Production secrets are encrypted Cloudflare Worker secrets and have never been committed. `.env` and `.dev.vars` are git-ignored. Because the source is public, deployments should still use strong, unique credentials and rotate them regularly.
 </details>
 
 <details>
 <summary><strong>Does the repository contain real business cards?</strong></summary>
 
-No. Real evaluation cards, ground truth and results are ignored. The committed cards are intentionally synthetic demonstration assets.
+No. Real evaluation cards, ground truth and results are git-ignored. Every card in this repository is a synthetic demonstration asset.
 </details>
 
 <details>
-<summary><strong>Can another organization use this?</strong></summary>
+<summary><strong>Can another organisation use this?</strong></summary>
 
-Yes. Create your own Cloudflare databases and Worker secrets, then replace the deployment values and branding. Every deployment must be isolated; forks must never send data to AAJ's production Worker.
+Yes. Create your own Cloudflare resources and secrets, replace the branding, and deploy. Forks must never send data to AAJ's production Worker.
 </details>
 
 ## Licence
 
-Released under the [MIT Licence](LICENSE). The AAJ name and logo identify the reference deployment; adopters should replace them with branding they are authorized to use.
+Code released under the [MIT Licence](LICENSE). The AAJ name and logo identify AAJ's reference deployment; please replace them with branding you are authorised to use.
