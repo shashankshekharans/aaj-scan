@@ -64,7 +64,7 @@ Turn a stack of English business cards into a HubSpot-ready CSV with **under 20 
 - Review table with thumbnails, flags, inline edit, delete, bulk approve of "Looks good" cards.
 - Card detail view: zoomable image beside editable fields, flags explained.
 - Skipped status (no email / non-English / user skipped) with reason.
-- CSV export (UTF-8 with BOM so Excel displays it correctly) with the 7 columns above.
+- CSV export (UTF-8, no byte-order mark, so HubSpot reads the first header cleanly) with the 7 columns above.
 - Skipped-cards list on the export screen.
 - "File saved? Clear this batch" deletion step.
 - Evaluation harness: scores extraction methods against the verified test set.
@@ -118,7 +118,7 @@ Excel export · HubSpot API push with "create only" · multi-card photos · per-
 | Image prep | Canvas resize (~1600 px long edge, JPEG), blur/brightness check; optional edge detection/perspective correction with jscanify + OpenCV.js (MIT / Apache-2.0) if the test set shows it helps | Free & open source |
 | Local OCR (cross-check + fallback) | Tesseract.js (Apache-2.0) in the browser; PaddleOCR.js (Apache-2.0) as alternative if Tesseract is too weak | Free & open source |
 | Parsing/validation | Email regex + domain checks, `libphonenumber-js` (MIT) for phone validation | Free & open source |
-| CSV | Papa Parse (MIT) `unparse` + UTF-8 BOM | Free & open source |
+| CSV | Built-in CSV writer, UTF-8 without a byte-order mark | Free & open source |
 | Proxy | Cloudflare Worker: holds provider keys as encrypted secrets (set in the Cloudflare dashboard), checks team passcode, one provider-neutral interface with an adapter per provider, automatic failover in priority order, stores nothing | Free service with usage limits *(daily request limit to verify on Cloudflare's current free plan)* |
 | Hosting | Cloudflare Pages (HTTPS required for camera) | Free service with usage limits |
 | Provider pool - Gemini | Google Gemini API free tier, e.g. `gemini-3.5-flash-lite` (image input + structured JSON) *(verified 2026-10-29)*; no card needed | Free service with usage limits - **limits not published, unverified** |

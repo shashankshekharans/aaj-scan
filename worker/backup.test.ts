@@ -134,7 +134,7 @@ describe("D1 contact backup", () => {
     await upsertBackupContact(db, { ...input, contactId: "a", batchId: "batch-phone-b", fields: { ...input.fields, company: 'A, "B"' } }, now);
     await upsertBackupContact(db, { ...input, contactId: "other-event", eventDate: "2026-11-03" }, now);
     const csv = await readBackupCsv(db, key);
-    expect(csv?.content).toBe('\uFEFF"First Name","Last Name","Company Name","Email","Job Title","Phone Number","Event Name"\r\n"Ada","Lovelace","A, ""B""","ada@example.test","","\'+91 123","AAJ Expo"\r\n"\'=1+1","\'+A","\'-A","\'@A","\'\tA","\'\rA","AAJ Expo"');
+    expect(csv?.content).toBe('"First Name","Last Name","Company Name","Email","Job Title","Phone Number","Event Name"\r\n"Ada","Lovelace","A, ""B""","ada@example.test","","\'+91 123","AAJ Expo"\r\n"\'=1+1","\'+A","\'-A","\'@A","\'\tA","\'\rA","AAJ Expo"');
     expect(queries.at(-1)?.sql).toMatch(/ORDER BY card_created_at ASC, contact_id ASC/i);
     expect(queries.at(-1)?.values).toEqual([key]);
     expect(await readBackupCsv(db, "a".repeat(64))).toBeNull();

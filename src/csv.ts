@@ -12,7 +12,8 @@ export function createCsvExport(batch: BatchRecord, cards: CardRecord[]) {
     const f = card.fields!;
     return [f.firstName, f.lastName, f.company, f.email, f.jobTitle, f.phone, batch.eventName].map(escape).join(",");
   });
-  const content = `\uFEFF${columns.map(escape).join(",")}\r\n${rows.join("\r\n")}`;
+  // No byte-order mark: importers that ignore it read "\u00EF\u00BB\u00BF" into the first header.
+  const content = `${columns.map(escape).join(",")}\r\n${rows.join("\r\n")}`;
   const filename = `${batch.eventName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "contacts"}.csv`;
   return { content, filename };
 }

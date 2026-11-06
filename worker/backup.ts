@@ -125,7 +125,8 @@ export async function readBackupCsv(db: BackupDatabase, eventKey: string) {
     WHERE event_key = ? ORDER BY card_created_at ASC, contact_id ASC`).bind(eventKey).all<BackupFields & { eventName: string }>();
   if (!results.length) return null;
   const rows = results.map((f) => [f.firstName, f.lastName, f.company, f.email, f.jobTitle, f.phone, f.eventName].map(csvEscape).join(","));
-  const content = `\uFEFF${CSV_COLUMNS.map(csvEscape).join(",")}\r\n${rows.join("\r\n")}`;
+  // No byte-order mark: importers that ignore it read "\u00EF\u00BB\u00BF" into the first header.
+  const content = `${CSV_COLUMNS.map(csvEscape).join(",")}\r\n${rows.join("\r\n")}`;
   const filename = `${results[0]!.eventName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "contacts"}.csv`;
   return { content, filename };
 }

@@ -11,7 +11,7 @@ const contact: CardRecord = {
 describe("createCsvExport", () => {
   it("exports only approved contacts with fields in the seven HubSpot columns", () => {
     const result = createCsvExport(batch, [contact, { ...contact, state: "needs_review" }, { ...contact, fields: undefined }]);
-    expect(result).toEqual({ filename: "trade-fair-2026.csv", content: '\uFEFF"First Name","Last Name","Company Name","Email","Job Title","Phone Number","Event Name"\r\n"Ada","Lovelace","ACME, ""India""","ada@example.com","","\'+919876543210","Trade Fair / 2026!"' });
+    expect(result).toEqual({ filename: "trade-fair-2026.csv", content: '"First Name","Last Name","Company Name","Email","Job Title","Phone Number","Event Name"\r\n"Ada","Lovelace","ACME, ""India""","ada@example.com","","\'+919876543210","Trade Fair / 2026!"' });
   });
 
   it("uses a safe default filename when the event has no filename characters", () => {
