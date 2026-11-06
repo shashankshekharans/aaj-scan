@@ -164,3 +164,17 @@ Yes. Create your own Cloudflare resources and secrets, replace the branding and 
 ## Licence
 
 Code released under the [MIT Licence](LICENSE). The AAJ name and logo identify AAJ's reference deployment; please replace them with branding you are authorised to use.
+
+---
+
+<div align="center">
+
+### Made by Shashank
+
+<a href="https://github.com/shashankshekharans"><img alt="GitHub: shashankshekharans" src="https://img.shields.io/badge/GitHub-shashankshekharans-24292f?logo=github&logoColor=white"></a>
+<a href="https://www.instagram.com/shashankshekharans/"><img alt="Instagram: shashankshekharans" src="https://img.shields.io/badge/Instagram-shashankshekharans-c13584?logo=instagram&logoColor=white"></a>
+<a href="https://x.com/SHASHANK_ANS"><img alt="X: SHASHANK_ANS" src="https://img.shields.io/badge/X-SHASHANK__ANS-000000?logo=x&logoColor=white"></a>
+
+<sub>Built for AAJ Supply Chain Management. Free tools only: GitHub, Cloudflare Workers, Google AI Studio and Cloudflare Workers AI free tiers.</sub>
+
+</div>
