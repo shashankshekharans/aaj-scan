@@ -39,7 +39,7 @@ The AAJ reference deployment uses the supplied AAJ logo, the red/ivory/charcoal 
 
 - Live production deployment, tested end to end on real Android devices.
 - Twelve synthetic business cards, confirmed fictional, under `demo/synthetic-cards/`.
-- Privacy-safe application screenshots under `docs/assets/`.
+- README hero and two animated demos under `docs/assets/`, recorded from the real app with a synthetic card.
 - Provider evaluation in `docs/EVALUATION_RESULTS.md`.
 - No testimonials, adoption metrics, pricing claims or public customer logos beyond AAJ; future surfaces must not fabricate them.
 

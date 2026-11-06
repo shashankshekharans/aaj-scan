@@ -1,5 +1,7 @@
 <div align="center">
-  <img src="public/aaj-scan-logo-90.webp" alt="AAJ Scan" width="392" />
+  <img src="public/aaj-scan-logo-90.webp" alt="AAJ Scan" width="300" />
+  <br /><br />
+  <img src="docs/assets/readme-hero.webp" alt="A stack of synthetic business cards, the AAJ Contact Scan review screen flagging what it is unsure about, and the resulting HubSpot CSV with 200 contacts" width="100%" />
 
   <h3>Every card from the event, in your CRM by Monday — checked, not guessed.</h3>
 
@@ -54,16 +56,16 @@ The method and full results are in [Evaluation results](docs/EVALUATION_RESULTS.
 ### On the phone — capture, review, approve
 
 <p align="center">
-  <img src="docs/assets/contact-scan-demo.gif" alt="AAJ Contact Scan on a phone: create an event, capture a synthetic card, review the extracted fields, approve and export" width="430" />
+  <img src="docs/assets/contact-scan-demo.webp" alt="AAJ Contact Scan on a phone: a synthetic card goes into the app, the AI reads it, flags what it is unsure about, the contact is approved and exported to a HubSpot CSV" width="430" />
 </p>
 
 ### On the desktop — the same flow, larger
 
 <p align="center">
-  <img src="docs/assets/contact-scan-desktop-demo.gif" alt="AAJ Contact Scan on a desktop browser: start an event, choose a synthetic card, extract, verify, approve, back up and export CSV" width="960" />
+  <img src="docs/assets/contact-scan-desktop-demo.webp" alt="AAJ Contact Scan in a desktop browser: the same flow, from a synthetic card to an approved contact in a HubSpot CSV" width="960" />
 </p>
 
-<p align="center"><sub>Recorded on the live production app with synthetic demonstration cards. No real contact data is shown.</sub></p>
+<p align="center"><sub>Real recordings of the app with a synthetic demonstration card. No real contact data is shown.</sub></p>
 
 ## Why teams trust it
 
