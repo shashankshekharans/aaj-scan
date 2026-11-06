@@ -11,17 +11,27 @@ const contact: CardRecord = {
 describe("createCsvExport", () => {
   it("exports only approved contacts with fields in the seven HubSpot columns", () => {
     const result = createCsvExport(batch, [contact, { ...contact, state: "needs_review" }, { ...contact, fields: undefined }]);
-    expect(result).toEqual({ filename: "trade-fair-2026.csv", content: '"First Name","Last Name","Company Name","Email","Job Title","Phone Number","Event Name"\r\n"Ada","Lovelace","ACME, ""India""","ada@example.com","","\'+919876543210","Trade Fair / 2026!"' });
+    expect(result).toEqual({ filename: "trade-fair-2026.csv", content: '"First Name","Last Name","Company Name","Email","Job Title","Phone Number","Event Name"\r\n"Ada","Lovelace","ACME, ""India""","ada@example.com","","+919876543210","Trade Fair / 2026!"' });
   });
 
   it("uses a safe default filename when the event has no filename characters", () => {
     expect(createCsvExport({ ...batch, eventName: "///" }, []).filename).toBe("contacts.csv");
   });
 
-  it.each(["=SUM(1,2)", "+123", "-123", "@formula", "\tformula", "\rformula"])("neutralizes leading spreadsheet controls in all exported fields: %j", (value) => {
-    const fields = { firstName: value, lastName: value, company: value, email: value, jobTitle: value, phone: value };
-    const row = createCsvExport({ ...batch, eventName: value }, [{ ...contact, fields }]).content.split("\r\n")[1];
-    expect(row).toBe(Array(7).fill(`"'${value}"`).join(","));
+  it.each(["=SUM(1,2)", "+123", "-123", "@formula", "\tformula", "\rformula"])("neutralizes leading spreadsheet controls in every text field: %j", (value) => {
+    const fields = { firstName: value, lastName: value, company: value, email: value, jobTitle: value, phone: null };
+    const cells = createCsvExport({ ...batch, eventName: value }, [{ ...contact, fields }]).content.split("\r\n")[1]!.split('","');
+    expect(cells.filter((_, i) => i !== 5).map((c) => c.replace(/^"|"$/g, ""))).toEqual(Array(6).fill(`'${value}`));
+  });
+
+  it.each([
+    ["=SUM(1,2)", `"'=SUM(1,2)"`],
+    ["@formula", `"'@formula"`],
+    ["+123", '"+123"'],
+    ["\tformula", '"formula"'],
+  ])("keeps plain phone numbers clean for HubSpot but neutralizes formulas in the phone column: %j", (phone, expected) => {
+    const row = createCsvExport(batch, [{ ...contact, fields: { ...contact.fields!, phone } }]).content.split("\r\n")[1]!;
+    expect(row.endsWith(`,${expected},"Trade Fair / 2026!"`)).toBe(true);
   });
 });
 

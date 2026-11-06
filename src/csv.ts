@@ -1,21 +1,11 @@
+import { contactsCsv, csvFilename } from "../core/csv";
 import type { BatchRecord, CardRecord } from "./db";
 
-const columns = ["First Name", "Last Name", "Company Name", "Email", "Job Title", "Phone Number", "Event Name"];
-const escape = (value: string | null | undefined) => {
-  const text = value ?? "";
-  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-  return `"${safe.replace(/"/g, '""')}"`;
-};
-
 export function createCsvExport(batch: BatchRecord, cards: CardRecord[]) {
-  const rows = cards.filter((card) => card.state === "approved" && card.fields).map((card) => {
-    const f = card.fields!;
-    return [f.firstName, f.lastName, f.company, f.email, f.jobTitle, f.phone, batch.eventName].map(escape).join(",");
-  });
-  // No byte-order mark: importers that ignore it read "\u00EF\u00BB\u00BF" into the first header.
-  const content = `${columns.map(escape).join(",")}\r\n${rows.join("\r\n")}`;
-  const filename = `${batch.eventName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "contacts"}.csv`;
-  return { content, filename };
+  const contacts = cards
+    .filter((card) => card.state === "approved" && card.fields)
+    .map((card) => ({ ...card.fields!, eventName: batch.eventName }));
+  return { content: contactsCsv(contacts), filename: csvFilename(batch.eventName) };
 }
 
 export function downloadCsv(batch: BatchRecord, cards: CardRecord[]) {

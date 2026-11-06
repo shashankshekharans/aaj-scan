@@ -1,4 +1,6 @@
 // Text-only backup boundary. Do not import browser/IndexedDB or extraction payloads.
+import { contactsCsv, csvFilename } from "../core/csv";
+
 interface BackupFields {
   firstName: string | null;
   lastName: string | null;
@@ -112,21 +114,11 @@ export async function listBackupEvents(db: BackupDatabase, options: { limit?: nu
   return { events, nextCursor: results.length > limit ? events.at(-1)!.eventKey : null };
 }
 
-const CSV_COLUMNS = ["First Name", "Last Name", "Company Name", "Email", "Job Title", "Phone Number", "Event Name"];
-const csvEscape = (value: string | null) => {
-  const text = value ?? "";
-  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
-  return `"${safe.replace(/"/g, '""')}"`;
-};
 export async function readBackupCsv(db: BackupDatabase, eventKey: string) {
   if (!EVENT_KEY.test(eventKey)) throw new BackupValidationError();
   const { results } = await db.prepare(`SELECT first_name AS firstName, last_name AS lastName, company, email,
     job_title AS jobTitle, phone, event_name AS eventName FROM backup_contacts
     WHERE event_key = ? ORDER BY card_created_at ASC, contact_id ASC`).bind(eventKey).all<BackupFields & { eventName: string }>();
   if (!results.length) return null;
-  const rows = results.map((f) => [f.firstName, f.lastName, f.company, f.email, f.jobTitle, f.phone, f.eventName].map(csvEscape).join(","));
-  // No byte-order mark: importers that ignore it read "\u00EF\u00BB\u00BF" into the first header.
-  const content = `${CSV_COLUMNS.map(csvEscape).join(",")}\r\n${rows.join("\r\n")}`;
-  const filename = `${results[0]!.eventName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "contacts"}.csv`;
-  return { content, filename };
+  return { content: contactsCsv(results), filename: csvFilename(results[0]!.eventName) };
 }
