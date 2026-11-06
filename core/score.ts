@@ -1,5 +1,5 @@
 // Scores a pipeline's CardResult against verified ground truth.
-// "Silent" = wrong and not flagged on that field — the metric that matters most.
+// "Silent" = wrong and not flagged on that field - the metric that matters most.
 
 import { ALL_FIELDS, type CardResult, type ContactFields, type FieldName, type SkipReason } from "./types";
 

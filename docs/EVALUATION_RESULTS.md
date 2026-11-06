@@ -4,10 +4,10 @@ Decision recorded 2026-10-31 after evaluating 20 verified business-card images.
 
 ## Provider order
 
-1. **Gemini (`gemini-3.5-flash-lite`) — primary.** Zero silent errors; 100% of cards marked “looks good” were fully correct.
-2. **Cloudflare Workers AI (`@cf/google/gemma-4-26b-a4b-it`) — fallback.** Zero silent errors; 100% of cards marked “looks good” were fully correct. It was materially slower than Gemini in the fresh run.
-3. **Groq (`qwen/qwen3.8-27b`) — manual-review only.** Seven silent field errors, five of them on cards marked “looks good”; it must not feed automatic approval.
-4. **OCR-only — manual fallback only.** It is useful for grounding model output, not as the extractor.
+1. **Gemini (`gemini-3.5-flash-lite`) - primary.** Zero silent errors; 100% of cards marked “looks good” were fully correct.
+2. **Cloudflare Workers AI (`@cf/google/gemma-4-26b-a4b-it`) - fallback.** Zero silent errors; 100% of cards marked “looks good” were fully correct. It was materially slower than Gemini in the fresh run.
+3. **Groq (`qwen/qwen3.8-27b`) - manual-review only.** Seven silent field errors, five of them on cards marked “looks good”; it must not feed automatic approval.
+4. **OCR-only - manual fallback only.** It is useful for grounding model output, not as the extractor.
 
 Mistral was unavailable without a paid plan. NVIDIA API-key access was unavailable pending account verification.
 

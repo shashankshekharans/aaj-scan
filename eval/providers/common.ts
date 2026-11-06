@@ -1,4 +1,4 @@
-// Shared plumbing for provider adapters: HTTP with timeout, and mapping
+// Shared plumbing for provider adapters: HTTP with timeout and mapping
 // provider errors onto three outcomes the runner (and later the Worker's
 // failover) understands.
 
@@ -53,7 +53,7 @@ export function classifyHttpError(status: number, headers: Headers, body: string
     return new RateLimitError(`429 rate limited: ${snippet}`, retry);
   }
   if (status === 400 || status === 422) return new BadRequestError(`${status}: ${snippet}`);
-  if (status === 401 || status === 403) return new Error(`${status} auth failed — check the API key: ${snippet}`);
+  if (status === 401 || status === 403) return new Error(`${status} auth failed - check the API key: ${snippet}`);
   return new Error(`${status}: ${snippet}`);
 }
 

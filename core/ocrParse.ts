@@ -1,5 +1,5 @@
 // Rule-based fallback: builds an Extraction from plain OCR text when no AI
-// provider is available. Deliberately conservative — callers add an
+// provider is available. Deliberately conservative - callers add an
 // "ocr_only" flag so every card from this path is reviewed by a person.
 
 import type { Extraction, PhoneType } from "./types";

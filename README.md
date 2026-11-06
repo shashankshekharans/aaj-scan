@@ -1,9 +1,12 @@
 <div align="center">
-  <img src="public/aaj-scan-logo-90.webp" alt="AAJ Scan" width="300" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/aaj-scan-logo-dark.webp" />
+    <img src="public/aaj-scan-logo-90.webp" alt="AAJ Scan" width="300" />
+  </picture>
   <br /><br />
-  <img src="docs/assets/readme-hero.webp" alt="A stack of synthetic business cards, the AAJ Contact Scan review screen flagging what it is unsure about, and the resulting HubSpot CSV with 200 contacts" width="100%" />
+  <img src="docs/assets/readme-hero.webp" alt="A stack of synthetic business cards, the AAJ Contact Scan review screen flagging what it is unsure about and the resulting HubSpot CSV with 200 contacts" width="100%" />
 
-  <h3>Every card from the event, in your CRM by Monday — checked, not guessed.</h3>
+  <h3>Every card from the event, in your CRM by Monday - checked, not guessed.</h3>
 
   <p>
     <a href="https://github.com/shashankshekharans/aaj-scan/actions/workflows/ci.yml"><img src="https://github.com/shashankshekharans/aaj-scan/actions/workflows/ci.yml/badge.svg" alt="CI status" /></a>
@@ -25,7 +28,7 @@
 
 The stall is packed away. What's left is a rubber-banded stack of business cards: two hundred conversations, each one a possible customer.
 
-Then someone types them up. Name, title, company, email, phone, one card at a time, a couple of minutes each. By card eighty, a `0` becomes an `O`, an email loses a letter, and a hot lead quietly bounces. The follow-up goes out days late, if it goes out at all.
+Then someone types them up. Name, title, company, email, phone, one card at a time, a couple of minutes each. By card eighty, a `0` becomes an `O`, an email loses a letter and a hot lead quietly bounces. The follow-up goes out days late, if it goes out at all.
 
 AAJ's marketing team lived this after every trade show. So we built the tool we wanted.
 
@@ -34,7 +37,7 @@ AAJ's marketing team lived this after every trade show. So we built the tool we 
 **Point a phone at a card. Check what it read. Send the list to HubSpot.**
 
 1. **Capture** the whole stack on an Android phone, one card at a time or as a fast batch, even with patchy venue Wi-Fi.
-2. **Extract** each card with AI that reads layout, not just letters, and cross-checks every value against the text actually printed on the card.
+2. **Extract** each card with AI that reads the layout as well as the letters, then cross-checks every value against the text actually printed on the card.
 3. **Review** a clean table. Cards the system is sure about are marked *looks good*; anything uncertain is flagged in plain language, never silently filled in.
 4. **Deliver** a HubSpot-ready CSV in one tap, with every contact tagged to the event it came from.
 
@@ -53,13 +56,13 @@ The method and full results are in [Evaluation results](docs/EVALUATION_RESULTS.
 
 ## See it work
 
-### On the phone — capture, review, approve
+### On the phone - capture, review, approve
 
 <p align="center">
   <img src="docs/assets/contact-scan-demo.webp" alt="AAJ Contact Scan on a phone: a synthetic card goes into the app, the AI reads it, flags what it is unsure about, the contact is approved and exported to a HubSpot CSV" width="430" />
 </p>
 
-### On the desktop — the same flow, larger
+### On the desktop - the same flow, larger
 
 <p align="center">
   <img src="docs/assets/contact-scan-desktop-demo.webp" alt="AAJ Contact Scan in a desktop browser: the same flow, from a synthetic card to an approved contact in a HubSpot CSV" width="960" />
@@ -155,7 +158,7 @@ No. Real evaluation cards, ground truth and results are git-ignored. Every card 
 <details>
 <summary><strong>Can another organisation use this?</strong></summary>
 
-Yes. Create your own Cloudflare resources and secrets, replace the branding, and deploy. Forks must never send data to AAJ's production Worker.
+Yes. Create your own Cloudflare resources and secrets, replace the branding and deploy. Forks must never send data to AAJ's production Worker.
 </details>
 
 ## Licence

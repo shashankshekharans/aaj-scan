@@ -66,7 +66,7 @@ Do not guess or copy another account's quotas. Provider dashboards remain author
 
 ## 6. Replace the branding
 
-Replace the logo/icon assets in `public/`, update the title and public links in `index.html`, and adjust the CSS tokens in `src/styles.css`. The AAJ name and logo identify the reference deployment and are not granted as reusable trademarks by the MIT code licence.
+Replace the logo/icon assets in `public/`, update the title and public links in `index.html` and adjust the CSS tokens in `src/styles.css`. The AAJ name and logo identify the reference deployment and are not granted as reusable trademarks by the MIT code licence.
 
 ## 7. Deploy and verify
 

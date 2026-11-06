@@ -15,6 +15,20 @@ for (const height of [60, 90]) {
   await sharp(wordmark).resize({ height }).webp({ quality: 90, alphaQuality: 100, effort: 6 }).toFile(`public/aaj-scan-logo-${height}.webp`);
 }
 
+// Dark-theme wordmark for the README (GitHub's dark page is #0d1117): the black
+// "scan" and the charcoal speed line turn light; AAJ red and every pixel's alpha
+// stay as they are, so anti-aliased edges remain smooth.
+{
+  const { data, info } = await sharp(wordmark).resize({ height: 90 }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < data.length; i += 4) {
+    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+    const neutral = Math.max(r, g, b) - Math.min(r, g, b) < 40;
+    if (neutral && r < 160) [data[i], data[i + 1], data[i + 2]] = [240, 242, 245];
+  }
+  await mkdir("docs/assets", { recursive: true });
+  await sharp(data, { raw: info }).webp({ quality: 90, alphaQuality: 100, effort: 6 }).toFile("docs/assets/aaj-scan-logo-dark.webp");
+}
+
 // Login logo: rendered 132px wide, so ship 2x and 3x widths.
 const mark = await sharp(SOURCE.mark).trim().toBuffer();
 for (const width of [264, 396]) {

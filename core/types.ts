@@ -18,7 +18,7 @@ export interface Extraction {
   website: string | null;
 }
 
-/** The exported contact — one row of the HubSpot CSV (minus Event Name). */
+/** The exported contact - one row of the HubSpot CSV (minus Event Name). */
 export interface ContactFields {
   firstName: string | null;
   lastName: string | null;

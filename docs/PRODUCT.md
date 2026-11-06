@@ -1,4 +1,4 @@
-# Product Brief — AAJ Contact Scan
+# Product Brief - AAJ Contact Scan
 
 ## Platform
 
@@ -10,7 +10,7 @@ The primary users are AAJ marketing team members collecting business cards at tr
 
 ## Product Purpose
 
-AAJ Contact Scan converts event business-card photos into reviewed, HubSpot-ready contact records. Success means a team can capture quickly in the field, verify every extracted field, share a CSV, and recover approved contact text if a phone export is missed.
+AAJ Contact Scan converts event business-card photos into reviewed, HubSpot-ready contact records. Success means a team can capture quickly in the field, verify every extracted field, share a CSV and recover approved contact text if a phone export is missed.
 
 ## Positioning
 

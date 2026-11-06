@@ -1,4 +1,4 @@
-# Contact Scan — Discovery Output
+# Contact Scan - Discovery Output
 
 Status: **Approved; MVP implemented** · Approved 2026-10-29 · Implementation updated 2026-10-31.
 
@@ -15,7 +15,7 @@ After each event, marketing types 50–300 business cards by hand into Excel (�
 1–3 marketing team members, **Android phones only**, working **in the office on Wi-Fi** after the event. 1–2 events per month. Contacts must reach HubSpot within 2–3 days.
 
 ### Goal
-Turn a stack of English business cards into a HubSpot-ready CSV with **under 20 seconds of human time per card** (including review) and **no silent errors** — every exported value is either correct or was visibly flagged to the reviewer.
+Turn a stack of English business cards into a HubSpot-ready CSV with **under 20 seconds of human time per card** (including review) and **no silent errors** - every exported value is either correct or was visibly flagged to the reviewer.
 
 ### Core workflow
 1. Open the app (installed PWA), enter the team passcode once.
@@ -42,7 +42,7 @@ Turn a stack of English business cards into a HubSpot-ready CSV with **under 20 
 | Phone | Optional; mobile preferred, office number dropped if both; exported as printed, no country code added | Phone Number |
 | Event | Entered once per batch | Event Name |
 
-**Never invented:** no guessed emails from website domains, no country code inferred from location, and no salutation/gender. One controlled fallback is allowed: when no company is printed and the card has a non-personal business email, derive the company from the email-domain label and flag it for human confirmation.
+**Never invented:** no guessed emails from website domains, no country code inferred from location and no salutation/gender. One controlled fallback is allowed: when no company is printed and the card has a non-personal business email, derive the company from the email-domain label and flag it for human confirmation.
 
 ---
 
@@ -58,7 +58,7 @@ Turn a stack of English business cards into a HubSpot-ready CSV with **under 20 
 - Image resize + re-encode on device (also strips EXIF/GPS).
 - Offline queue with automatic resume; screen wake lock during batch processing.
 - AI field extraction through a **pool of free cloud vision providers** behind a proxy, with structured JSON output and **automatic failover** (quota exhausted / error → next provider in priority order).
-- Settings screen: status per provider (active / quota exhausted / key missing — keys never shown) and a manual "prefer provider X" override.
+- Settings screen: status per provider (active / quota exhausted / key missing - keys never shown) and a manual "prefer provider X" override.
 - Review table shows which provider read each card.
 - Validation + flagging layer (see §5).
 - Review table with thumbnails, flags, inline edit, delete, bulk approve of "Looks good" cards.
@@ -101,7 +101,7 @@ Excel export · HubSpot API push with "create only" · multi-card photos · per-
 | Dev complexity | Low–medium (one web app + ~100-line Worker) | Lowest | Highest (Kotlin/Android toolchain, signing, updates) | Medium–high (server, model ops, networking) |
 | Batch processing | Yes; foreground with wake lock | Yes | Yes; true background work possible | Yes; server-side queue |
 | Offline | App opens offline; photos queue until online | Same | Could OCR offline; AI still needs internet | Works without internet on LAN only |
-| Privacy | Images go to cloud provider (accepted); key never on phones | Key extractable from phones | Same as A | Best — data never leaves office |
+| Privacy | Images go to cloud provider (accepted); key never on phones | Key extractable from phones | Same as A | Best - data never leaves office |
 | Maintainability | Provider/model switch in one place (proxy) | Key rotation on every phone | Two codebases worth of tooling | Model/server upkeep, single point of failure |
 
 **Recommendation: A.** It is the simplest option that meets every requirement. Android-only removes the main PWA weakness (iOS limits). D is ruled out by hardware; C adds cost in complexity without a requirement that needs it.
@@ -121,11 +121,11 @@ Excel export · HubSpot API push with "create only" · multi-card photos · per-
 | CSV | Papa Parse (MIT) `unparse` + UTF-8 BOM | Free & open source |
 | Proxy | Cloudflare Worker: holds provider keys as encrypted secrets (set in the Cloudflare dashboard), checks team passcode, one provider-neutral interface with an adapter per provider, automatic failover in priority order, stores nothing | Free service with usage limits *(daily request limit to verify on Cloudflare's current free plan)* |
 | Hosting | Cloudflare Pages (HTTPS required for camera) | Free service with usage limits |
-| Provider pool — Gemini | Google Gemini API free tier, e.g. `gemini-3.5-flash-lite` (image input + structured JSON) *(verified 2026-10-29)*; no card needed | Free service with usage limits — **limits not published, unverified** |
-| Provider pool — Groq | Groq free plan, `qwen/qwen3.8-27b` vision (JSON mode) *(model verified; free-plan limits unverified)* | Free service with usage limits |
-| Provider pool — Cloudflare Workers AI | Vision model via the Worker's AI binding (no separate key), e.g. `llama-3.2-11b-vision`; 10,000 free Neurons/day *(verified)*; per-card Neuron cost unverified | Free service with usage limits |
-| Provider pool — Mistral | Mistral free (Experiment) mode, vision-capable model; training opt-out available *(limits unverified)* — kept only if it passes evaluation | Free service with usage limits |
-| Priority order | Set from evaluation results (most accurate first) | — |
+| Provider pool - Gemini | Google Gemini API free tier, e.g. `gemini-3.5-flash-lite` (image input + structured JSON) *(verified 2026-10-29)*; no card needed | Free service with usage limits - **limits not published, unverified** |
+| Provider pool - Groq | Groq free plan, `qwen/qwen3.8-27b` vision (JSON mode) *(model verified; free-plan limits unverified)* | Free service with usage limits |
+| Provider pool - Cloudflare Workers AI | Vision model via the Worker's AI binding (no separate key), e.g. `llama-3.2-11b-vision`; 10,000 free Neurons/day *(verified)*; per-card Neuron cost unverified | Free service with usage limits |
+| Provider pool - Mistral | Mistral free (Experiment) mode, vision-capable model; training opt-out available *(limits unverified)* - kept only if it passes evaluation | Free service with usage limits |
+| Priority order | Set from evaluation results (most accurate first) | - |
 | Fallback (no AI) | Tesseract.js + rule parser (every card flagged for review) | Free & open source |
 | Tests | Vitest (parsers/validators), evaluation script (Node) against the labelled test set | Free & open source |
 
@@ -138,7 +138,7 @@ Excel export · HubSpot API push with "create only" · multi-card photos · per-
 ## 5. OCR / AI accuracy strategy
 
 ### Pipeline
-1. **Capture quality gate (on phone):** reject/prompt retake for blurry (Laplacian variance), too dark, or too small images — at capture time, while the card is in hand.
+1. **Capture quality gate (on phone):** reject/prompt retake for blurry (Laplacian variance), too dark, or too small images - at capture time, while the card is in hand.
 2. **Prepare:** resize, re-encode (strips EXIF), optional perspective correction (only if the evaluation shows a gain).
 3. **Extract (cloud vision model):** strict JSON schema; each field returns the value **and the exact text as printed**, or `null`. Prompt forbids inference; model also reports `language` and lists *all* emails/phones seen.
 4. **Ground (local OCR):** Tesseract.js reads the same image. Every extracted value must be found (fuzzy match) in the OCR text or the model's verbatim text; mismatch → flag. This is the main defence against invented values.
@@ -154,13 +154,13 @@ Excel export · HubSpot API push with "create only" · multi-card photos · per-
 ### Evaluation (before choosing the provider)
 - **Test set:** 20–30 deliberately varied card photos from the team (dark backgrounds, vertical layouts, tiny fonts, logo text, two phones, initials in names). A maintainer transcribes ground truth; **a second person verifies it against the physical cards**.
 - **Methods compared:** (A) Tesseract + rules only · (B) Gemini · (C) Groq · (D) Cloudflare Workers AI · (E) Mistral · each of B–E with OCR grounding. Results set the failover priority order; a provider that misses the targets is excluded from the pool.
-- **Metrics:** per-field accuracy after normalisation; **silent error rate** (wrong value not flagged — the key metric); flag rate (share of cards needing individual review); quota used; time per card.
+- **Metrics:** per-field accuracy after normalisation; **silent error rate** (wrong value not flagged - the key metric); flag rate (share of cards needing individual review); quota used; time per card.
 - **Targets (to validate):** silent errors ≤ 1 field in the whole test set; flag rate ≤ 30% of cards; required-field accuracy ≥ 95% on "Looks good" cards.
 
 ### Limitations (honest)
 - 20–30 cards is a small sample; it catches big problems, not rare ones. Track corrections in real use to keep improving.
 - Vision models can produce plausible text that is not on the card; grounding reduces this but stylised fonts that OCR misreads will cause **extra flags** (safe, but more review time).
-- Free-tier limits and models change without notice; Gemini models are retired regularly — model name is a proxy setting.
+- Free-tier limits and models change without notice; Gemini models are retired regularly - model name is a proxy setting.
 - Very glossy, embossed, or low-contrast cards may fail all methods; they will be flagged, not silently wrong.
 
 ---

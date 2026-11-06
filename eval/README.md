@@ -4,7 +4,7 @@ Before trusting any AI provider with real contacts, measure it on real cards. Th
 
 ## Prepare a test set
 
-1. **Collect 20–30 card photos** in `eval/cards/` as `card-01.jpg`, `card-02.jpg`, … Include the difficult ones: dark backgrounds, vertical layouts, tiny fonts, two phone numbers, initials in names, and one or two cards without an email.
+1. **Collect 20–30 card photos** in `eval/cards/` as `card-01.jpg`, `card-02.jpg`, … Include the difficult ones: dark backgrounds, vertical layouts, tiny fonts, two phone numbers, initials in names and one or two cards without an email.
 2. **Write the ground truth** in `eval/ground-truth.json` (format below). One person transcribes; a second person checks every entry against the physical card.
 3. **Add provider keys** by copying `.env.example` to `.env`. Providers without a key are skipped.
 

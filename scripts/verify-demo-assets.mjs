@@ -6,13 +6,13 @@ const root = process.cwd();
 const cards = Array.from({ length: 12 }, (_, index) =>
   path.join(root, "demo", "synthetic-cards", `synthetic-card-${String(index + 1).padStart(2, "0")}.webp`),
 );
-const hero = path.join(root, "docs", "assets", "readme-hero.webp");
+const readmeImages = ["readme-hero.webp", "aaj-scan-logo-dark.webp"].map((file) => path.join(root, "docs", "assets", file));
 const demos = [
   { file: "contact-scan-demo.webp", width: 430, height: 764 },
   { file: "contact-scan-desktop-demo.webp", width: 960, height: 540 },
 ];
 
-for (const file of [...cards, hero]) {
+for (const file of [...cards, ...readmeImages]) {
   const details = await stat(file);
   if (details.size > 500_000) throw new Error(`${path.relative(root, file)} exceeds 500 KB`);
   const metadata = await sharp(file).metadata();
@@ -37,5 +37,5 @@ for (const demo of demos) {
 }
 
 console.log(
-  `Verified ${cards.length} synthetic cards, the README hero and ${demos.length} animated demos.`,
+  `Verified ${cards.length} synthetic cards, ${readmeImages.length} README images and ${demos.length} animated demos.`,
 );

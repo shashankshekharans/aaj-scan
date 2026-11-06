@@ -2,7 +2,7 @@
   font-family: "Inter Variable", Inter, system-ui, sans-serif;
   color: #2c2c2c;
   background: #eef0f2;
-  color-scheme: light;
+  color-scheme: only light;
   font-synthesis: none;
   --red: #c22028;
   --red-deep: #9f161d;

@@ -245,7 +245,7 @@ describe("backup lifecycle", () => {
     expect(await db.cards.get("a")).toMatchObject({ backupState: "synced", fields: { company: "Corrected" } });
   });
 
-  it("starts on unlock/app restore, resumes online, polls due retries, and stops cleanly", async () => {
+  it("starts on unlock/app restore, resumes online, polls due retries and stops cleanly", async () => {
     // Only timer/browser boundaries are substituted; approval and coordinator use real IndexedDB.
     const events = new EventTarget();
     let tick: (() => void) | undefined;

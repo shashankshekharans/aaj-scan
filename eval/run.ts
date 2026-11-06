@@ -84,7 +84,7 @@ async function main() {
     process.exit(1);
   }
   const truth: Truth[] | null = existsSync(TRUTH) ? JSON.parse(readFileSync(TRUTH, "utf8")) : null;
-  if (!truth) console.warn("No eval/ground-truth.json yet — running extraction only, no scoring.\n");
+  if (!truth) console.warn("No eval/ground-truth.json yet - running extraction only, no scoring.\n");
 
   const configured = PROVIDERS.filter((p) => p.requiredEnv.every((k) => process.env[k]));
   const wanted = opt("methods")?.split(",");
@@ -127,7 +127,7 @@ async function main() {
     const run: MethodRun = { method: "ocr-only", model: "tesseract.js + rules", results: new Map(), latencyMs: [], calls: 0 };
     for (const f of files) {
       const r = buildCard(parseOcrText(ocr.get(f)!), null);
-      r.flags.push({ code: "ocr_only", severity: "review", message: "Read without AI — review every field" });
+      r.flags.push({ code: "ocr_only", severity: "review", message: "Read without AI - review every field" });
       if (r.status.kind === "looks_good") r.status = { kind: "needs_review" };
       run.results.set(f, r);
     }
@@ -185,7 +185,7 @@ async function runProvider(p: Provider, files: string[], prepared: Map<string, {
     try {
       const r = buildCard(parseExtraction(raw), grounding ? ocr.get(f)! : null);
       run.results.set(f, r);
-      console.log(`  ${f}: ${r.status.kind}${r.flags.length ? " — " + r.flags.map((x) => x.code + (x.field ? ":" + x.field : "")).join(", ") : ""}`);
+      console.log(`  ${f}: ${r.status.kind}${r.flags.length ? " - " + r.flags.map((x) => x.code + (x.field ? ":" + x.field : "")).join(", ") : ""}`);
     } catch (e) {
       run.results.set(f, { error: `unparseable answer: ${(e as Error).message}` });
       console.log(`  ${f}: unparseable answer`);
@@ -199,16 +199,16 @@ const median = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math
 
 function writeReport(runs: MethodRun[], files: string[], truth: Truth[] | null, grounding: boolean) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const lines: string[] = [`# Extraction evaluation — ${new Date().toISOString().slice(0, 16)}`, "", `Cards: ${files.length} · OCR grounding: ${grounding ? "on" : "off"}`, ""];
+  const lines: string[] = [`# Extraction evaluation - ${new Date().toISOString().slice(0, 16)}`, "", `Cards: ${files.length} · OCR grounding: ${grounding ? "on" : "off"}`, ""];
   const json: Record<string, unknown> = {};
 
   if (!truth) {
-    lines.push("No ground truth yet — extraction output only.", "");
+    lines.push("No ground truth yet - extraction output only.", "");
     for (const run of runs) {
       lines.push(`## ${run.method} (${run.model})`, "", "| Card | Status | First | Last | Company | Email | Title | Phone | Flags |", "|---|---|---|---|---|---|---|---|---|");
       for (const f of files) {
         const r = run.results.get(f);
-        if (!r || "error" in r) lines.push(`| ${f} | ERROR | ${r ? r.error.slice(0, 80) : "—"} |||||||`);
+        if (!r || "error" in r) lines.push(`| ${f} | ERROR | ${r ? r.error.slice(0, 80) : "-"} |||||||`);
         else {
           const x = r.fields;
           lines.push(`| ${f} | ${r.status.kind === "skipped" ? "skipped:" + r.status.reason : r.status.kind} | ${x.firstName ?? ""} | ${x.lastName ?? ""} | ${x.company ?? ""} | ${x.email ?? ""} | ${x.jobTitle ?? ""} | ${x.phone ?? ""} | ${r.flags.map((g) => g.code + (g.field ? ":" + g.field : "")).join(", ")} |`);
@@ -243,12 +243,12 @@ function writeReport(runs: MethodRun[], files: string[], truth: Truth[] | null, 
     lines.push("", "Targets (PRD §5): silent errors ≤ 1 across the set · flag rate ≤ 30% · required-field accuracy ≥ 95% on 'looks good' cards.", "");
 
     for (const [run, , scores] of summaries) {
-      lines.push(`## ${run.method} — mistakes`, "");
+      lines.push(`## ${run.method} - mistakes`, "");
       if (run.stoppedReason) lines.push(`Stopped early: ${run.stoppedReason}`, "");
       const bad = scores.flatMap((s) =>
         s.skipOutcome !== "not_applicable" && s.skipOutcome !== "correct_skip"
           ? [`- ${s.file}: ${s.skipOutcome} (status ${s.status})`]
-          : s.fields.filter((f) => f.outcome !== "correct").map((f) => `- ${s.file} · ${f.field}: expected \`${f.expected ?? "∅"}\`, got \`${f.got ?? "∅"}\` — **${f.outcome}**`),
+          : s.fields.filter((f) => f.outcome !== "correct").map((f) => `- ${s.file} · ${f.field}: expected \`${f.expected ?? "∅"}\`, got \`${f.got ?? "∅"}\` - **${f.outcome}**`),
       );
       lines.push(...(bad.length ? bad : ["None."]), "");
       json[run.method] = { scores };
